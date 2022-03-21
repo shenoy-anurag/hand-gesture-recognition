@@ -6,7 +6,7 @@ We are comparing hand gestures with the same gestures being performed on a cube 
 
 # Demo
 
-![demo-gif](https://media0.giphy.com/media/kwFhnQYxXTXtcXIc4m/giphy.gif)
+![demo-gif](https://media.giphy.com/media/kwFhnQYxXTXtcXIc4m/giphy-downsized.gif)
 
 # Getting Started
 
