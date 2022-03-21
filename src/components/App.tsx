@@ -9,12 +9,14 @@ import Webcam from 'react-webcam';
 import { css } from '@emotion/css';
 import { Camera } from '@mediapipe/camera_utils';
 import { Hands, Results } from '@mediapipe/hands';
-import { drawCanvas } from '../utils/drawCanvas';
+import { drawCanvas, resetCubeTracker } from '../utils/drawCanvas';
 
 export const App: VFC = () => {
 	const webcamRef = useRef<Webcam>(null)
 	const canvasRef = useRef<HTMLCanvasElement>(null)
 	const resultsRef = useRef<Results>()
+
+	// const [resultsArr, setResultsArr] = useState([resultsRef.current?.multiHandLandmarks, resultsRef.current?.multiHandLandmarks, resultsRef.current?.multiHandLandmarks]);
 
 	/**
 	 * @param results
@@ -23,6 +25,7 @@ export const App: VFC = () => {
 		resultsRef.current = results
 
 		const canvasCtx = canvasRef.current!.getContext('2d')!
+		// const canvasCtx2 = canvasRef.current!.getContext('experimental-webgl')!
 		drawCanvas(canvasCtx, results)
 	}, [])
 
@@ -58,6 +61,15 @@ export const App: VFC = () => {
 	const OutputData = () => {
 		const results = resultsRef.current!
 		console.log(results.multiHandLandmarks)
+		// setResultsArr([
+		// 	...resultsArr.slice(1, 3),
+		// 	resultsRef.current?.multiHandLandmarks
+		// ]);
+		// console.log(resultsArr)
+	}
+
+	const ResetTask = () => {
+		resetCubeTracker()
 	}
 
 	return (
@@ -76,8 +88,11 @@ export const App: VFC = () => {
 			<canvas ref={canvasRef} className={styles.canvas} width={1280} height={720} />
 			{/* output */}
 			<div className={styles.buttonContainer}>
-				<button className={styles.button} onClick={OutputData}>
+				{/* <button className={styles.button} onClick={OutputData}>
 					Output Data
+				</button> */}
+				<button className={styles.button} onClick={ResetTask}>
+					Reset
 				</button>
 			</div>
 		</div>
@@ -105,8 +120,8 @@ const styles = {
 	`,
 	buttonContainer: css`
 		position: absolute;
-		top: 20px;
-		left: 20px;
+		top: 10px;
+		left: 10px;
 	`,
 	button: css`
 		color: #fff;
