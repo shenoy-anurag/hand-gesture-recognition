@@ -8,6 +8,9 @@ We are comparing hand gestures with the same gestures being performed on a cube 
 
 ![demo-gif](https://media.giphy.com/media/kwFhnQYxXTXtcXIc4m/giphy-downsized.gif)
 
+# Try it out
+Try it out here: https://gesturex.herokuapp.com/
+
 # Getting Started
 
 ## Available Scripts
