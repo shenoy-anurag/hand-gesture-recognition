@@ -4,6 +4,10 @@ This is a Hand Gesture Recognition App being built for Human Computer Interactio
 
 We are comparing hand gestures with the same gestures being performed on a cube to research which technique is better and more intuitive for people to use to manipulate 3D objects.
 
+# Demo
+
+![demo-gif](https://bnz05pap002files.storage.live.com/y4mwX-8XRD0W24cSXnuV79EiD6iDwxKGI18jiSnhb1OocK_caUQDj26zGpFdHp1hnuVb3pE3lxSpyCSZuwLpXFlbnKG8fX4YJ-LDeuOR7H4QN-J3AeQCptncimhMODhxVhQvkct9lw7DF2Jkfjl3pVLGi0YrujHCX2khHu-JkR-dmEuYmxEenNBcdVor75S4eWp?width=600&height=338&cropmode=none)
+
 # Getting Started
 
 ## Available Scripts
