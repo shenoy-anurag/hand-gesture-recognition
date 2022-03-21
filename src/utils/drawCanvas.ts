@@ -49,6 +49,7 @@ class CubeTracker {
 	wy: number
 	h: number
 	color: string
+	strokeColor: string
 	// circum circle properties
 	cx: number
 	cy: number
@@ -56,13 +57,14 @@ class CubeTracker {
 	r1: number
 	r2: number
 
-	constructor(x: number, y: number, wx: number, wy: number, h: number, color: string) {
+	constructor(x: number, y: number, wx: number, wy: number, h: number, color: string, strokeColor: string) {
 		this.x = x
 		this.y = y
 		this.wx = wx
 		this.wy = wy
 		this.h = h
 		this.color = color
+		this.strokeColor = strokeColor
 		let [x1, y1, r] = this.circumCircle()
 		this.cx = x1
 		this.cy = y1
@@ -108,7 +110,7 @@ export const resetCubeTracker = () => {
 }
 
 let rsm = new ResultsManager([undefined, undefined, undefined])
-let cubeTracker = new CubeTracker(300, 300, 50, 50, 50, '#ff8200')
+let cubeTracker = new CubeTracker(300, 300, 50, 50, 50, '#ff8200', '#ff6000')
 
 
 function calcTranslation(width: number, height: number) {
@@ -195,7 +197,7 @@ const drawCircle = (ctx: CanvasRenderingContext2D, x: number, y: number, r: numb
 	ctx.stroke()
 }
 
-const drawCube = (ctx: CanvasRenderingContext2D, x: number, y: number, wx: number, wy: number, h: number, color: string, stroke?: boolean, fill?: boolean) => {
+const drawCube = (ctx: CanvasRenderingContext2D, x: number, y: number, wx: number, wy: number, h: number, color: string, strokeColor?: string, stroke?: boolean, fill?: boolean) => {
 	// const canvasRef = useRef<HTMLCanvasElement>(null)
 	// canvasRef.current!.getContext("experimental-webgl")
 	// LINE MODE
@@ -203,6 +205,7 @@ const drawCube = (ctx: CanvasRenderingContext2D, x: number, y: number, wx: numbe
 
 	if (stroke === undefined) stroke = true
 	if (fill === undefined) fill = true
+	if (strokeColor === undefined) strokeColor = '#FFFFFF'
 
 	// left face
 	ctx.beginPath();
@@ -213,7 +216,8 @@ const drawCube = (ctx: CanvasRenderingContext2D, x: number, y: number, wx: numbe
 	ctx.closePath();
 	// ctx.fillStyle = "#838357"
 	ctx.fillStyle = color;
-	ctx.strokeStyle = "#7a7a51";
+	// ctx.strokeStyle = "#7a7a51";
+	ctx.strokeStyle = strokeColor;
 	if (stroke === true) ctx.stroke();
 	if (fill === true) ctx.fill();
 
@@ -226,10 +230,11 @@ const drawCube = (ctx: CanvasRenderingContext2D, x: number, y: number, wx: numbe
 	ctx.closePath();
 	// ctx.fillStyle = "#6f6f49";
 	ctx.fillStyle = color;
-	ctx.strokeStyle = "#676744";
+	// ctx.strokeStyle = "#676744";
+	ctx.strokeStyle = strokeColor;
 	if (stroke === true) ctx.stroke();
 	if (fill === true) ctx.fill();
-
+	
 	// center face
 	ctx.beginPath();
 	ctx.moveTo(x, y - h);
@@ -239,7 +244,8 @@ const drawCube = (ctx: CanvasRenderingContext2D, x: number, y: number, wx: numbe
 	ctx.closePath();
 	// ctx.fillStyle = "#989865";
 	ctx.fillStyle = color;
-	ctx.strokeStyle = "#8e8e5e";
+	// ctx.strokeStyle = "#8e8e5e";
+	ctx.strokeStyle = strokeColor;
 	if (stroke === true) ctx.stroke();
 	if (fill === true) ctx.fill();
 
@@ -300,6 +306,7 @@ export const drawCanvas = (ctx: CanvasRenderingContext2D, results: Results) => {
 			cubeTracker.translate(xDev, yDev);
 		}
 		drawCube(ctx, cubeTracker.x, cubeTracker.y, cubeTracker.wx, cubeTracker.wy, cubeTracker.h, cubeTracker.color) // green: #8fce00 red: #cc0000 orange: #ff8200 dark-blue: #2A385B
+		drawCube(ctx, 1000, 200, 100, 100, 100, '#cc0000', '#ffffff', true, false) // green: #8fce00 red: #cc0000 orange: #ff8200 dark-blue: #2A385B
 	}
 	ctx.restore()
 }
