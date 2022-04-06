@@ -1,3 +1,4 @@
+import * as Kalidokit from "kalidokit";
 import { matrix, multiply, inv, transpose } from 'mathjs'
 import { drawConnectors, drawLandmarks } from '@mediapipe/drawing_utils';
 import { HAND_CONNECTIONS, NormalizedLandmarkListList, Results } from '@mediapipe/hands';
@@ -234,7 +235,7 @@ const drawCube = (ctx: CanvasRenderingContext2D, x: number, y: number, wx: numbe
 	ctx.strokeStyle = strokeColor;
 	if (stroke === true) ctx.stroke();
 	if (fill === true) ctx.fill();
-	
+
 	// center face
 	ctx.beginPath();
 	ctx.moveTo(x, y - h);
@@ -262,7 +263,7 @@ const detectGrabbingCube = (ctx: CanvasRenderingContext2D, handLandmarks: Normal
 			const [x2, y2] = [handLandmarks[0][4].x * width, handLandmarks[0][4].y * height]
 			const dist1 = Math.abs(calcDistance(x1, y1, cubeTracker.cx, cubeTracker.cy))
 			const dist2 = Math.abs(calcDistance(x2, y2, cubeTracker.cx, cubeTracker.cy))
-			console.log(dist1, dist2, cubeTracker.r1, cubeTracker.r2, cubeTracker.cx, cubeTracker.cy)
+			// console.log(dist1, dist2, cubeTracker.r1, cubeTracker.r2, cubeTracker.cx, cubeTracker.cy)
 			if (dist1 < cubeTracker.r1 && dist2 < cubeTracker.r1 && dist1 > cubeTracker.r2 && dist2 > cubeTracker.r2) {
 				return true
 			} else return false
@@ -271,11 +272,376 @@ const detectGrabbingCube = (ctx: CanvasRenderingContext2D, handLandmarks: Normal
 	return false
 }
 
+
+
+const cubePositions = [
+	// Front face
+	-1.0, -1.0, 1.0,
+	1.0, -1.0, 1.0,
+	1.0, 1.0, 1.0,
+	-1.0, 1.0, 1.0,
+
+	// Back face
+	-1.0, -1.0, -1.0,
+	-1.0, 1.0, -1.0,
+	1.0, 1.0, -1.0,
+	1.0, -1.0, -1.0,
+
+	// Top face
+	-1.0, 1.0, -1.0,
+	-1.0, 1.0, 1.0,
+	1.0, 1.0, 1.0,
+	1.0, 1.0, -1.0,
+
+	// Bottom face
+	-1.0, -1.0, -1.0,
+	1.0, -1.0, -1.0,
+	1.0, -1.0, 1.0,
+	-1.0, -1.0, 1.0,
+
+	// Right face
+	1.0, -1.0, -1.0,
+	1.0, 1.0, -1.0,
+	1.0, 1.0, 1.0,
+	1.0, -1.0, 1.0,
+
+	// Left face
+	-1.0, -1.0, -1.0,
+	-1.0, -1.0, 1.0,
+	-1.0, 1.0, 1.0,
+	-1.0, 1.0, -1.0,
+];
+
+
+
+var vertices = [
+	-1,-1,-1, 1,-1,-1, 1, 1,-1, -1, 1,-1,
+	-1,-1, 1, 1,-1, 1, 1, 1, 1, -1, 1, 1,
+	-1,-1,-1, -1, 1,-1, -1, 1, 1, -1,-1, 1,
+	1,-1,-1, 1, 1,-1, 1, 1, 1, 1,-1, 1,
+	-1,-1,-1, -1,-1, 1, 1,-1, 1, 1,-1,-1,
+	-1, 1,-1, -1, 1, 1, 1, 1, 1, 1, 1,-1, 
+];
+
+var colors = [
+	5,3,7, 5,3,7, 5,3,7, 5,3,7,
+	1,1,3, 1,1,3, 1,1,3, 1,1,3,
+	0,0,1, 0,0,1, 0,0,1, 0,0,1,
+	1,0,0, 1,0,0, 1,0,0, 1,0,0,
+	1,1,0, 1,1,0, 1,1,0, 1,1,0,
+	0,1,0, 0,1,0, 0,1,0, 0,1,0 
+];
+
+var indices = [
+	0,1,2, 0,2,3, 4,5,6, 4,6,7,
+	8,9,10, 8,10,11, 12,13,14, 12,14,15,
+	16,17,18, 16,18,19, 20,21,22, 20,22,23 
+];
+
+function get_projection(angle: number, a: number, zMin: number, zMax: number) {
+	var ang = Math.tan((angle * .5) * Math.PI / 180);//angle*.5
+	return [
+		0.5 / ang, 0, 0, 0,
+		0, 0.5 * a / ang, 0, 0,
+		0, 0, -(zMax + zMin) / (zMax - zMin), -1,
+		0, 0, (-2 * zMax * zMin) / (zMax - zMin), 0
+	];
+}
+
+var mo_matrix = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
+var view_matrix = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
+
+class WebGLCubeTracker {
+	cubePositions: any
+	vertices: any
+	colors: any
+	indices: any
+	Pmatrix: any
+	Vmatrix: any
+	Mmatrix: any
+	index_buffer: any
+	proj_matrix: any
+	mo_matrix: number[]
+	view_matrix: number[]
+
+	constructor(cubePositions: any, vertices: any, colors: any, indices: any, mo_matrix: any, view_matrix: any, width: number, height: number) {
+		this.cubePositions = cubePositions
+		this.vertices = vertices
+		this.colors = colors
+		this.indices = indices
+		this.proj_matrix = get_projection(40, width / height, 1, 100);
+		this.mo_matrix = mo_matrix
+		this.view_matrix = view_matrix
+		this.view_matrix[14] = this.view_matrix[14] - 6;
+	}
+}
+
+let webGLCubeTracker = new WebGLCubeTracker(cubePositions, vertices, colors, indices, mo_matrix, view_matrix, 1280, 720)
+
+export const initGL = (gl: WebGLRenderingContext) => {
+	// Create and store data into vertex buffer
+	var vertex_buffer = gl.createBuffer();
+	gl.bindBuffer(gl.ARRAY_BUFFER, vertex_buffer);
+	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
+
+	// Create and store data into color buffer
+	var color_buffer = gl.createBuffer();
+	gl.bindBuffer(gl.ARRAY_BUFFER, color_buffer);
+	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(colors), gl.STATIC_DRAW);
+
+	// Create and store data into index buffer
+	var index_buffer = gl.createBuffer();
+	gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, index_buffer);
+	gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indices), gl.STATIC_DRAW);
+
+	/*=================== SHADERS =================== */
+
+	var vertCode = 'attribute vec3 position;' +
+		'uniform mat4 Pmatrix;' +
+		'uniform mat4 Vmatrix;' +
+		'uniform mat4 Mmatrix;' +
+		'attribute vec3 color;' +//the color of the point
+		'varying vec3 vColor;' +
+		'void main(void) { ' +//pre-built function
+		'gl_Position = Pmatrix*Vmatrix*Mmatrix*vec4(position, 1.);' +
+		'vColor = color;' +
+		'}';
+
+	var fragCode = 'precision mediump float;' +
+		'varying vec3 vColor;' +
+		'void main(void) {' +
+		'gl_FragColor = vec4(vColor, 1.);' +
+		'}';
+
+	var vertShader = gl.createShader(gl.VERTEX_SHADER);
+	if (vertShader !== null) gl.shaderSource(vertShader, vertCode);
+	if (vertShader !== null) gl.compileShader(vertShader);
+
+	var fragShader = gl.createShader(gl.FRAGMENT_SHADER);
+	if (fragShader !== null) gl.shaderSource(fragShader, fragCode);
+	if (fragShader !== null) gl.compileShader(fragShader);
+
+	var shaderprogram = gl.createProgram();
+	if (shaderprogram !== null && vertShader !== null) gl.attachShader(shaderprogram, vertShader);
+	if (shaderprogram !== null && fragShader !== null) gl.attachShader(shaderprogram, fragShader);
+	if (shaderprogram !== null) gl.linkProgram(shaderprogram);
+
+	/*======== Associating attributes to vertex shader =====*/
+	if (shaderprogram !== null) {
+		var _Pmatrix = gl.getUniformLocation(shaderprogram, "Pmatrix");
+		var _Vmatrix = gl.getUniformLocation(shaderprogram, "Vmatrix");
+		var _Mmatrix = gl.getUniformLocation(shaderprogram, "Mmatrix");
+
+		gl.bindBuffer(gl.ARRAY_BUFFER, vertex_buffer);
+		var _position = gl.getAttribLocation(shaderprogram, "position");
+		gl.vertexAttribPointer(_position, 3, gl.FLOAT, false, 0, 0);
+		gl.enableVertexAttribArray(_position);
+
+		gl.bindBuffer(gl.ARRAY_BUFFER, color_buffer);
+		var _color = gl.getAttribLocation(shaderprogram, "color");
+		gl.vertexAttribPointer(_color, 3, gl.FLOAT, false, 0, 0);
+		gl.enableVertexAttribArray(_color);
+		gl.useProgram(shaderprogram);
+		return [_Pmatrix, _Vmatrix, _Mmatrix, index_buffer]
+	}
+	return [null, null, null, null]
+}
+
+export const drawGLCube = (gl: WebGLRenderingContext) => {
+	/*==================== MATRIX ====================== */
+	const width = gl.canvas.width
+	const height = gl.canvas.height
+
+	let [Pmatrix, Vmatrix, Mmatrix, index_buffer] = initGL(gl);
+
+	/*=========================rotation================*/
+
+	function rotateX(m: any, angle: number) {
+		var c = Math.cos(angle);
+		var s = Math.sin(angle);
+		var mv1 = m[1], mv5 = m[5], mv9 = m[9];
+
+		m[1] = m[1] * c - m[2] * s;
+		m[5] = m[5] * c - m[6] * s;
+		m[9] = m[9] * c - m[10] * s;
+
+		m[2] = m[2] * c + mv1 * s;
+		m[6] = m[6] * c + mv5 * s;
+		m[10] = m[10] * c + mv9 * s;
+	}
+
+	function rotateY(m: any, angle: number) {
+		var c = Math.cos(angle);
+		var s = Math.sin(angle);
+		var mv0 = m[0], mv4 = m[4], mv8 = m[8];
+
+		m[0] = c * m[0] + s * m[2];
+		m[4] = c * m[4] + s * m[6];
+		m[8] = c * m[8] + s * m[10];
+
+		m[2] = c * m[2] - s * mv0;
+		m[6] = c * m[6] - s * mv4;
+		m[10] = c * m[10] - s * mv8;
+	}
+
+	/*================= Mouse events ======================*/
+
+	var AMORTIZATION = 0.95;
+	var drag = false;
+	var old_x: number;
+	var old_y: number;
+	var dX = 0, dY = 0;
+
+	var mouseDown = function (e: any) {
+		drag = true;
+		old_x = e.pageX;
+		old_y = e.pageY;
+		e.preventDefault();
+		return false;
+	};
+
+	var mouseUp = function (e: any) {
+		drag = false;
+	};
+
+	var mouseMove = function (e: any) {
+		if (!drag) return false;
+		dX = (e.pageX - old_x) * 2 * Math.PI / width;
+		dY = (e.pageY - old_y) * 2 * Math.PI / height;
+		THETA += dX;
+		PHI += dY;
+		old_x = e.pageX
+		old_y = e.pageY;
+		e.preventDefault();
+	};
+
+	gl.canvas.addEventListener("mousedown", mouseDown, false);
+	gl.canvas.addEventListener("mouseup", mouseUp, false);
+	gl.canvas.addEventListener("mouseout", mouseUp, false);
+	gl.canvas.addEventListener("mousemove", mouseMove, false);
+
+	/*=================== Drawing =================== */
+
+	var THETA = 0,
+		PHI = 0;
+	var time_old = 0;
+
+	var animate = function (time: number) {
+		var dt = time - time_old;
+
+		if (!drag) {
+			dX *= AMORTIZATION;
+			dY *= AMORTIZATION;
+			THETA += dX;
+			PHI += dY;
+		}
+
+		//set model matrix to I4
+
+		mo_matrix[0] = 1
+		mo_matrix[1] = 0
+		mo_matrix[2] = 0
+		mo_matrix[3] = 0
+
+		mo_matrix[4] = 0
+		mo_matrix[5] = 1
+		mo_matrix[6] = 0
+		mo_matrix[7] = 0
+
+		mo_matrix[8] = 0
+		mo_matrix[9] = 0
+		mo_matrix[10] = 1
+		mo_matrix[11] = 0
+
+		mo_matrix[12] = 0
+		mo_matrix[13] = 0
+		mo_matrix[14] = 0
+		mo_matrix[15] = 1
+
+		rotateY(mo_matrix, THETA);
+		rotateX(mo_matrix, PHI);
+
+		time_old = time;
+		gl.enable(gl.DEPTH_TEST);
+
+		// gl.depthFunc(gl.LEQUAL);
+
+		gl.clearColor(0.5, 0.5, 0.5, 0.9);
+		gl.clearDepth(1.0);
+		gl.viewport(0.0, 0.0, width, height);
+		gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+		gl.uniformMatrix4fv(Pmatrix, false, proj_matrix);
+		gl.uniformMatrix4fv(Vmatrix, false, view_matrix);
+		gl.uniformMatrix4fv(Mmatrix, false, mo_matrix);
+
+		gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, index_buffer);
+		gl.drawElements(gl.TRIANGLES, indices.length, gl.UNSIGNED_SHORT, 0);
+
+		window.requestAnimationFrame(animate);
+	}
+	animate(0);
+}
+
 /**
  * @param ctx canvas context
+ * @param gl webgl context
  * @param results mediapipe model results
  */
-export const drawCanvas = (ctx: CanvasRenderingContext2D, results: Results) => {
+export const drawGLCanvas = (gl: any, ctx: CanvasRenderingContext2D, results: Results) => {
+	rsm.setResultsArr(results.multiHandLandmarks)
+	rsm.setResultsWorldArr(results.multiHandWorldLandmarks)
+	// console.log(rsm.resultsArr)
+
+	const width = ctx.canvas.width
+	const height = ctx.canvas.height
+
+	ctx.save()
+	ctx.clearRect(0, 0, width, height)
+	ctx.scale(-1, 1)
+	ctx.translate(-width, 0)
+	// show image
+	ctx.drawImage(results.image, 0, 0, width, height)
+
+	let [Pmatrix, Vmatrix, Mmatrix, index_buffer] = initGL(gl);
+	webGLCubeTracker.Pmatrix = Pmatrix
+	webGLCubeTracker.Vmatrix = Vmatrix
+	webGLCubeTracker.Mmatrix = Mmatrix
+	webGLCubeTracker.index_buffer = index_buffer
+	drawGLCube(gl);
+
+
+	// show hand landmarks
+	if (results.multiHandLandmarks) {
+		// show connectors and landmarks
+		for (const landmarks of results.multiHandLandmarks) {
+			drawConnectors(ctx, landmarks, HAND_CONNECTIONS, { color: '#00FF00', lineWidth: 5 })
+			drawLandmarks(ctx, landmarks, { color: '#FF0000', lineWidth: 1, radius: 5 })
+		}
+		// show the circle based on landmarks
+		// drawCircleBwHands(ctx, results.multiHandLandmarks);
+		const isGrabbing = detectGrabbingCube(ctx, results.multiHandLandmarks)
+		console.log(isGrabbing)
+		if (isGrabbing === true) {
+			let [xDev, yDev] = calcTranslation(width, height)
+			console.log(xDev, yDev)
+			cubeTracker.translate(xDev, yDev);
+		}
+		if (results.multiHandLandmarks !== undefined && results.multiHandLandmarks.length > 0) {
+			let rightHandRig = Kalidokit.Hand.solve(results.multiHandLandmarks[0], "Right")
+			console.log(rightHandRig)
+		}
+		drawCube(ctx, cubeTracker.x, cubeTracker.y, cubeTracker.wx, cubeTracker.wy, cubeTracker.h, cubeTracker.color) // green: #8fce00 red: #cc0000 orange: #ff8200 dark-blue: #2A385B
+		drawCube(ctx, 1000, 200, 100, 100, 100, '#cc0000', '#ffffff', true, false) // green: #8fce00 red: #cc0000 orange: #ff8200 dark-blue: #2A385B
+	}
+	ctx.restore()
+}
+
+/**
+ * @param ctx webgl context
+ * @param results mediapipe model results
+ */
+ export const drawCanvas = (ctx: CanvasRenderingContext2D, results: Results) => {
 	rsm.setResultsArr(results.multiHandLandmarks)
 	rsm.setResultsWorldArr(results.multiHandWorldLandmarks)
 	// console.log(rsm.resultsArr)
@@ -304,6 +670,10 @@ export const drawCanvas = (ctx: CanvasRenderingContext2D, results: Results) => {
 			let [xDev, yDev] = calcTranslation(width, height)
 			console.log(xDev, yDev)
 			cubeTracker.translate(xDev, yDev);
+		}
+		if (results.multiHandLandmarks !== undefined && results.multiHandLandmarks.length > 0) {
+			let rightHandRig = Kalidokit.Hand.solve(results.multiHandLandmarks[0], "Right")
+			console.log(rightHandRig)
 		}
 		drawCube(ctx, cubeTracker.x, cubeTracker.y, cubeTracker.wx, cubeTracker.wy, cubeTracker.h, cubeTracker.color) // green: #8fce00 red: #cc0000 orange: #ff8200 dark-blue: #2A385B
 		drawCube(ctx, 1000, 200, 100, 100, 100, '#cc0000', '#ffffff', true, false) // green: #8fce00 red: #cc0000 orange: #ff8200 dark-blue: #2A385B

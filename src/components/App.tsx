@@ -9,14 +9,19 @@ import Webcam from 'react-webcam';
 import { css } from '@emotion/css';
 import { Camera } from '@mediapipe/camera_utils';
 import { Hands, Results } from '@mediapipe/hands';
-import { drawCanvas, resetCubeTracker } from '../utils/drawCanvas';
+import { drawCanvas, drawGLCanvas, initGL, resetCubeTracker, Pmatrix, _Vmatrix, _Mmatrix, index_buffer } from '../utils/drawCanvas';
+import *  as utils from '../utils/drawCanvas';
 
 export const App: VFC = () => {
 	const webcamRef = useRef<Webcam>(null)
 	const canvasRef = useRef<HTMLCanvasElement>(null)
+	const canvasRef2 = useRef<HTMLCanvasElement>(null)
 	const resultsRef = useRef<Results>()
 
 	// const [resultsArr, setResultsArr] = useState([resultsRef.current?.multiHandLandmarks, resultsRef.current?.multiHandLandmarks, resultsRef.current?.multiHandLandmarks]);
+
+	const glCtx = canvasRef2.current!.getContext('webgl')!
+	let [pmatrix, vmatrix, mmatrix, i_buffer] = initGL(glCtx);
 
 	/**
 	 * @param results
@@ -25,8 +30,11 @@ export const App: VFC = () => {
 		resultsRef.current = results
 
 		const canvasCtx = canvasRef.current!.getContext('2d')!
-		// const canvasCtx2 = canvasRef.current!.getContext('experimental-webgl')!
-		drawCanvas(canvasCtx, results)
+		const glCtx = canvasRef2.current!.getContext('webgl')!
+		if (glCtx === null) console.log("No WebGL context!")
+		drawGLCanvas(glCtx, canvasCtx, results);
+		// if (glCtx === null) drawCanvas(canvasCtx, results);
+		// else drawGLCanvas(glCtx, canvasCtx, results);
 	}, [])
 
 	useEffect(() => {
@@ -86,6 +94,7 @@ export const App: VFC = () => {
 			/>
 			{/* draw */}
 			<canvas ref={canvasRef} className={styles.canvas} width={1280} height={720} />
+			<canvas ref={canvasRef2} className={styles.canvas} width={1280} height={720} />
 			{/* output */}
 			<div className={styles.buttonContainer}>
 				{/* <button className={styles.button} onClick={OutputData}>
