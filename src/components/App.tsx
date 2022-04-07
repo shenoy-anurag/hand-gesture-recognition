@@ -9,19 +9,18 @@ import Webcam from 'react-webcam';
 import { css } from '@emotion/css';
 import { Camera } from '@mediapipe/camera_utils';
 import { Hands, Results } from '@mediapipe/hands';
-import { drawCanvas, drawGLCanvas, initGL, resetCubeTracker, Pmatrix, _Vmatrix, _Mmatrix, index_buffer } from '../utils/drawCanvas';
+import { drawCanvas, drawGLCanvas, initGL, resetCubeTracker, webGLCubeTracker } from '../utils/drawCanvas';
 import *  as utils from '../utils/drawCanvas';
+import { Viewer, GLTFLoaderPlugin, STLLoaderPlugin, CameraControl } from "@xeokit/xeokit-sdk";
+
+let viewer: any
+// let viewer: Viewer
 
 export const App: VFC = () => {
 	const webcamRef = useRef<Webcam>(null)
 	const canvasRef = useRef<HTMLCanvasElement>(null)
 	const canvasRef2 = useRef<HTMLCanvasElement>(null)
 	const resultsRef = useRef<Results>()
-
-	// const [resultsArr, setResultsArr] = useState([resultsRef.current?.multiHandLandmarks, resultsRef.current?.multiHandLandmarks, resultsRef.current?.multiHandLandmarks]);
-
-	const glCtx = canvasRef2.current!.getContext('webgl')!
-	let [pmatrix, vmatrix, mmatrix, i_buffer] = initGL(glCtx);
 
 	/**
 	 * @param results
@@ -30,14 +29,109 @@ export const App: VFC = () => {
 		resultsRef.current = results
 
 		const canvasCtx = canvasRef.current!.getContext('2d')!
-		const glCtx = canvasRef2.current!.getContext('webgl')!
+		const glCtx = canvasRef2.current!.getContext('webgl', { premultipliedAlpha: false })!
 		if (glCtx === null) console.log("No WebGL context!")
+		// let [pmatrix, vmatrix, mmatrix, i_buffer] = initGL(glCtx);
+		// webGLCubeTracker.Pmatrix = pmatrix
+		// webGLCubeTracker.Vmatrix = vmatrix
+		// webGLCubeTracker.Mmatrix = mmatrix
+		// webGLCubeTracker.index_buffer = i_buffer
 		drawGLCanvas(glCtx, canvasCtx, results);
 		// if (glCtx === null) drawCanvas(canvasCtx, results);
 		// else drawGLCanvas(glCtx, canvasCtx, results);
+
+		
 	}, [])
 
 	useEffect(() => {
+		viewer = new Viewer({
+			// canvasId: "glCanvas",
+			canvasElement: canvasRef2.current!,
+			transparent: true
+		});
+
+		// viewer.camera.eye = [-3.933, 2.855, 27.018];
+		// viewer.camera.look = [4.400, 3.724, 8.899];
+		// viewer.camera.up = [-0.018, 0.999, 0.039];
+
+		viewer.camera.eye = [0, 0, 0];
+		viewer.camera.look = [4.400, 3.724, 8.899];
+		viewer.camera.up = [-0.018, 0.999, 0.039];
+		viewer.scene.selectedMaterial.fillAlpha = 0.9;
+
+		const gltfLoader = new GLTFLoaderPlugin(viewer);
+		// const box_model = gltfLoader.load({
+		// 	id: "assets/gltf/shapes/Box0.bin",
+		// 	src: "assets/gltf/shapes/Box.gltf",
+		// 	position: [25, 15, 5],
+		// 	rotation: [0, 0, -90],
+		// 	scale: [1, 1, 1],
+		// 	edges: true,
+		// });
+		// box_model.on("loaded", () => {
+		// 	viewer.cameraFlight.flyTo(box_model);
+		// });
+		// console.log("numPoints", box_model.visible)
+		// box_model.destroy()
+
+		const box_model = gltfLoader.load({
+			id: "box1",
+			src: "assets/gltf/shapes/BoxTextured.gltf",
+			position: [25, 15, 5],
+			rotation: [0, 0, -90],
+			scale: [10, 10, 10],
+			edges: true,
+			performance: false
+		});
+		box_model.on("loaded", () => {
+			viewer.cameraFlight.flyTo(box_model);
+		});
+		console.log("numPoints", box_model.visible)
+		box_model.destroy()
+
+		// const gltfLoader = new GLTFLoaderPlugin(viewer);
+		// const avocado_model = gltfLoader.load({
+		// 	id: "assets/gltf/Avocado/Avocado.gltf",
+		// 	src: "assets/gltf/Avocado/Avocado.gltf",
+		// });
+		// avocado_model.on("loaded", () => {
+		// 	viewer.cameraFlight.flyTo(avocado_model);
+		// });
+		// avocado_model.destroy()
+
+		// const stlLoader = new STLLoaderPlugin(viewer);
+
+		// const geometry_dash_model = stlLoader.load({
+		// 	id: "assets/games/geo-dash.stl",
+		// 	src: "assets/games/geo-dash.stl",
+		// 	position: [0.5, -0.5, 0.2],
+		// 	rotation: [0, 0, -90],
+		// 	scale: [.05, .05, .05]
+		// });
+		// geometry_dash_model.on("loaded", function () { // Model is an Entity
+		// 	viewer.cameraFlight.flyTo(geometry_dash_model);
+		// });
+		// geometry_dash_model.destroy();
+
+		// const cube = stlLoader.load({
+		// 	id: "assets/cube/perfect-cube.stl",
+		// 	src: "assets/cube/perfect-cube.stl",
+		// 	edges: true,
+		// 	smoothNormals: true,
+		// 	position: [25, 15, 5],
+		// 	rotation: [0, 0, -90],
+		// 	scale: [.05, .05, .05]
+		// });
+		// cube.on("loaded", function () { // Model is an Entity
+		// 	viewer.cameraFlight.flyTo(cube);
+		// });
+		// cube.destroy()
+
+		// const rotate = () => {
+		// 	viewer.camera.orbitYaw(-0.2);
+		// }
+		// viewer.scene.on("tick", rotate);
+
 		const hands = new Hands({
 			locateFile: file => {
 				return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
@@ -94,7 +188,7 @@ export const App: VFC = () => {
 			/>
 			{/* draw */}
 			<canvas ref={canvasRef} className={styles.canvas} width={1280} height={720} />
-			<canvas ref={canvasRef2} className={styles.canvas} width={1280} height={720} />
+			<canvas ref={canvasRef2} className={styles.gl} width={1280} height={720} itemID="glCanvas" />
 			{/* output */}
 			<div className={styles.buttonContainer}>
 				{/* <button className={styles.button} onClick={OutputData}>
@@ -126,6 +220,12 @@ const styles = {
 		width: 1280px;
 		height: 720px;
 		background-color: #fff;
+	`,
+	gl: css`
+		position: absolute;
+		width: 1280px;
+		height: 720px;
+		border:0px #000000 none;
 	`,
 	buttonContainer: css`
 		position: absolute;

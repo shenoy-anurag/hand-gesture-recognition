@@ -1,8 +1,19 @@
 import * as Kalidokit from "kalidokit";
-import { matrix, multiply, inv, transpose } from 'mathjs'
+import { matrix, multiply, inv, transpose, im } from 'mathjs'
 import { drawConnectors, drawLandmarks } from '@mediapipe/drawing_utils';
 import { HAND_CONNECTIONS, NormalizedLandmarkListList, Results } from '@mediapipe/hands';
+// import * as xeogl from "xeogl";
+// import * as xeogl from "../../node_modules/xeogl/build/xeogl.js";
+// const xeogl = require('xeogl');
+// import * as xeogl from "xeogl";
 
+
+// var box_model = new xeogl.GLTFModel({
+//     id: "box",
+//     src: "../../models/gltf/shapes/Box.gltf"
+// });
+
+// console.log(box_model)
 
 function calcDistance(x1: number, y1: number, x2: number, y2: number) {
 	const dist = Math.sqrt(Math.pow(x1 - x2, 2) + Math.pow(y1 - y2, 2))
@@ -376,7 +387,7 @@ class WebGLCubeTracker {
 	}
 }
 
-let webGLCubeTracker = new WebGLCubeTracker(cubePositions, vertices, colors, indices, mo_matrix, view_matrix, 1280, 720)
+export let webGLCubeTracker = new WebGLCubeTracker(cubePositions, vertices, colors, indices, mo_matrix, view_matrix, 1280, 720)
 
 export const initGL = (gl: WebGLRenderingContext) => {
 	// Create and store data into vertex buffer
@@ -452,8 +463,7 @@ export const drawGLCube = (gl: WebGLRenderingContext) => {
 	const width = gl.canvas.width
 	const height = gl.canvas.height
 
-	let [Pmatrix, Vmatrix, Mmatrix, index_buffer] = initGL(gl);
-
+	var proj_matrix = get_projection(40, width/height, 1, 100);
 	/*=========================rotation================*/
 
 	function rotateX(m: any, angle: number) {
@@ -566,22 +576,24 @@ export const drawGLCube = (gl: WebGLRenderingContext) => {
 
 		// gl.depthFunc(gl.LEQUAL);
 
-		gl.clearColor(0.5, 0.5, 0.5, 0.9);
+		// gl.clearColor(0.5, 0.5, 0.5, 0.9);
+		gl.clearColor(0.0, 0, 0, 0);
 		gl.clearDepth(1.0);
-		gl.viewport(0.0, 0.0, width, height);
 		gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+		gl.viewport(0.0, 0.0, width, height);
 
-		gl.uniformMatrix4fv(Pmatrix, false, proj_matrix);
-		gl.uniformMatrix4fv(Vmatrix, false, view_matrix);
-		gl.uniformMatrix4fv(Mmatrix, false, mo_matrix);
+		gl.uniformMatrix4fv(webGLCubeTracker.Pmatrix, false, proj_matrix);
+		gl.uniformMatrix4fv(webGLCubeTracker.Vmatrix, false, view_matrix);
+		gl.uniformMatrix4fv(webGLCubeTracker.Mmatrix, false, mo_matrix);
 
-		gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, index_buffer);
+		gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, webGLCubeTracker.index_buffer);
 		gl.drawElements(gl.TRIANGLES, indices.length, gl.UNSIGNED_SHORT, 0);
-
 		window.requestAnimationFrame(animate);
 	}
-	animate(0);
+	return animate
 }
+
+let time = 0
 
 /**
  * @param ctx canvas context
@@ -603,12 +615,13 @@ export const drawGLCanvas = (gl: any, ctx: CanvasRenderingContext2D, results: Re
 	// show image
 	ctx.drawImage(results.image, 0, 0, width, height)
 
-	let [Pmatrix, Vmatrix, Mmatrix, index_buffer] = initGL(gl);
-	webGLCubeTracker.Pmatrix = Pmatrix
-	webGLCubeTracker.Vmatrix = Vmatrix
-	webGLCubeTracker.Mmatrix = Mmatrix
-	webGLCubeTracker.index_buffer = index_buffer
-	drawGLCube(gl);
+	// let [Pmatrix, Vmatrix, Mmatrix, index_buffer] = initGL(gl);
+	// webGLCubeTracker.Pmatrix = Pmatrix
+	// webGLCubeTracker.Vmatrix = Vmatrix
+	// webGLCubeTracker.Mmatrix = Mmatrix
+	// webGLCubeTracker.index_buffer = index_buffer
+	// let animate = drawGLCube(gl);
+	// animate(++time);
 
 
 	// show hand landmarks
