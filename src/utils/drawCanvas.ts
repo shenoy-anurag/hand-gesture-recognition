@@ -258,6 +258,34 @@ function calcRotation() {
 	rsm.rotationMat = transpose(mulVal)
 }
 
+const findBoundingBox2 = (scene: BABYLON.Scene) => {
+	var root_meshes = scene.meshes.filter((x) => {
+		return x.parent == null
+	})
+	var root: any = root_meshes[0]
+	let childMeshes = root.getChildMeshes();
+	let min = childMeshes[0].getBoundingInfo().boundingBox.minimumWorld;
+	let max = childMeshes[0].getBoundingInfo().boundingBox.maximumWorld;
+	for (let i = 0; i < childMeshes.length; i++) {
+		let meshMin = childMeshes[i].getBoundingInfo().boundingBox.minimumWorld;
+		let meshMax = childMeshes[i].getBoundingInfo().boundingBox.maximumWorld;
+
+		min = BABYLON.Vector3.Minimize(min, meshMin);
+		max = BABYLON.Vector3.Maximize(max, meshMax);
+	}
+	const size = max.subtract(min);
+
+	const boundingInfo = new BABYLON.BoundingInfo(min, max);
+	const bbCenterWorld = boundingInfo.boundingBox.centerWorld;
+
+	// const m = BABYLON.MeshBuilder.CreateBox("bounds", { size: 1 }, scene);
+	// m.scaling.copyFrom(size);
+	// m.position.copyFrom(bbCenterWorld);
+	// m.visibility = 0.1;
+
+	return [size, bbCenterWorld, root]
+}
+
 const drawCircle = (ctx: CanvasRenderingContext2D, x: number, y: number, r: number, linewidth?: number, color?: string) => {
 	ctx.strokeStyle = color ? color : '#0082cf'
 	ctx.lineWidth = linewidth ? linewidth : 5
@@ -340,14 +368,16 @@ const detectGrabbingCube = (ctx: CanvasRenderingContext2D, handLandmarks: Normal
 	return false
 }
 
-const detectGrabbingCar = (ctx: CanvasRenderingContext2D, handLandmarks: NormalizedLandmarkListList, car_model: any) => {
+const detectGrabbingCar = (ctx: CanvasRenderingContext2D, handLandmarks: NormalizedLandmarkListList, scene: BABYLON.Scene) => {
 	if (handLandmarks.length === 1 && handLandmarks[0] !== undefined) {
 		if (handLandmarks.length === 1 && handLandmarks[0].length > 8) {
 			const width = ctx.canvas.width
 			const height = ctx.canvas.height
 			const [x1, y1] = [handLandmarks[0][8].x * width, handLandmarks[0][8].y * height]
 			const [x2, y2] = [handLandmarks[0][4].x * width, handLandmarks[0][4].y * height]
-			const [xmin, ymin, zmin, xmax, ymax, zmax] = car_model.aabb
+			let [size, bbCenterWorld, root] = findBoundingBox2(scene)
+			const [xmin, ymin, zmin, xmax, ymax, zmax] = [root.position.x, root.position.y, root.position.z, size[0], size[1], size[2]]
+			console.log("values: ", [xmin, ymin, zmin, xmax, ymax, zmax])
 			carTracker.setValues(xmin, ymin, xmax, ymax, zmin, zmax)
 			const dist1 = Math.abs(calcDistance(x1, y1, carTracker.cx, carTracker.cy))
 			const dist2 = Math.abs(calcDistance(x2, y2, carTracker.cx, carTracker.cy))
@@ -432,13 +462,12 @@ export const drawGLCanvas = (gl: any, ctx: CanvasRenderingContext2D, results: Re
 		// show the circle based on landmarks
 		// drawCircleBwHands(ctx, results.multiHandLandmarks);
 
-		// const isGrabbingCar = detectGrabbingCar(ctx, results.multiHandLandmarks, car_model)
-		// 	console.log("grabbing car", isGrabbingCar)
-		// 	if (isGrabbingCar === true) {
-		// 		let [xDev, yDev] = calcTranslation(width, height)
-		// 		console.log(xDev, yDev)
-		// 		carTracker.translate(xDev, yDev);
-		// 	}
+		// const isGrabbingCar = detectGrabbingCar(ctx, results.multiHandLandmarks, scene)
+		// console.log("grabbing car", isGrabbingCar)
+		// if (isGrabbingCar === true) {
+		// 	// let [xDev, yDev] = calcTranslation(width, height)
+		// 	// console.log(xDev, yDev)
+		// 	// carTracker.translate(xDev, yDev);
 		// }
 		let [xDev, yDev] = calcTranslation(width, height)
 		let deviations = [xDev, yDev, 0]
@@ -458,8 +487,8 @@ export const drawGLCanvas = (gl: any, ctx: CanvasRenderingContext2D, results: Re
 			let rightHandRig = Hand.solve(results.multiHandLandmarks[0], "Right")
 			console.log(rightHandRig)
 			var angles = [
-				rightHandRig?.RightWrist.x ? rightHandRig?.RightWrist.x : 0, 
-				rightHandRig?.RightWrist.y ? rightHandRig?.RightWrist.y : 0, 
+				rightHandRig?.RightWrist.x ? rightHandRig?.RightWrist.x : 0,
+				rightHandRig?.RightWrist.y ? rightHandRig?.RightWrist.y : 0,
 				rightHandRig?.RightWrist.z ? rightHandRig?.RightWrist.z : 0
 			]
 			rotateCar(parent_mesh, scene, carTracker, angles)

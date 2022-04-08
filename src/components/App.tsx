@@ -36,21 +36,12 @@ export const App: VFC = () => {
 		const glCtx = canvasRef2.current!.getContext('webgl', { premultipliedAlpha: false })!
 		if (glCtx === null) console.log("No WebGL context!")
 		// console.log("in results")
-		// let [pmatrix, vmatrix, mmatrix, i_buffer] = initGL(glCtx);
-		// webGLCubeTracker.Pmatrix = pmatrix
-		// webGLCubeTracker.Vmatrix = vmatrix
-		// webGLCubeTracker.Mmatrix = mmatrix
-		// webGLCubeTracker.index_buffer = i_buffer
-		// findBoundingBox(gScene)
+
 		var [size, bbCenterWorld, root] = findBoundingBox2(gScene)
 		var projectedPosition = getProjectedPosition(gScene)
 		console.log(projectedPosition);
-		showWorldAxis(gScene, 5)
-		// gEngine.runRenderLoop(function () { // Register a render loop to repeatedly render the scene
-		// 	console.log("re-render")
-		// 	gScene.render();
-		// 	// scene2.render();
-		// });
+		// showWorldAxis(gScene, 5)
+
 		drawGLCanvas(glCtx, canvasCtx, results, gScene, root);
 		// if (glCtx === null) drawCanvas(canvasCtx, results);
 		// else drawGLCanvas(glCtx, canvasCtx, results);
@@ -208,38 +199,46 @@ export const App: VFC = () => {
 		BABYLON.SceneLoader.Append("assets/gltf/honda_civic/scene.gltf", "", scene, function (scene) {
 			console.log("loaded model!")
 			// findBoundingBox(scene);
-			findBoundingBox2(scene)
+			var [size, bbCenterWorld, root] = findBoundingBox2(scene)
+			root.position = new BABYLON.Vector3(-10, -5, 0);// position mesh in your scene
 		}, null, null, ".gltf");
 
-		scene.clearColor = new BABYLON.Color4(0, 0, 0, 0);
-
-		return scene;
-	};
-
-	/******* Add the create scene function ******/
-	var createScene2 = function (engine: BABYLON.Engine, glCtx: WebGLRenderingContext) {
-		// Create the scene space
-		var scene = new BABYLON.Scene(engine);
-
-		// scene.autoClear = false
-		scene.clearColor = new BABYLON.Color4(0, 0, 0, 0);
-		// Add a camera to the scene and attach it to the canvas
-		var camera = new BABYLON.ArcRotateCamera("Camera", Math.PI / 2, 15 * Math.PI / 32, 25, BABYLON.Vector3.Zero(), scene);
-		camera.attachControl(glCtx, true);
-
-		// Add lights to the scene
-		var light1 = new BABYLON.HemisphericLight("light1", new BABYLON.Vector3(1, 1, 0), scene);
-		var light2 = new BABYLON.PointLight("Omni0", new BABYLON.Vector3(0, 1, -1), scene);
-
-		// GLTFFileLoader.IncrementalLoading = false
-		BABYLON.SceneLoader.Append("assets/gltf/concrete_block/scene.gltf", "", scene, function (scene) {
+			// GLTFFileLoader.IncrementalLoading = false
+		BABYLON.SceneLoader.ImportMesh("", "assets/gltf/concrete_block/scene.gltf", "", scene, function (newMeshes) {
 			console.log("loaded concrete block!")
+			newMeshes[0].position = new BABYLON.Vector3(17, -5, 0);// position mesh in your scene
+			newMeshes[0].rotate(BABYLON.Axis.X, 0.3, BABYLON.Space.LOCAL)
 		}, null, null, ".gltf");
 
 		scene.clearColor = new BABYLON.Color4(0, 0, 0, 0);
 
 		return scene;
 	};
+
+	// /******* Add the create scene function ******/
+	// var createScene2 = function (engine: BABYLON.Engine, glCtx: WebGLRenderingContext) {
+	// 	// Create the scene space
+	// 	var scene = new BABYLON.Scene(engine);
+
+	// 	// scene.autoClear = false
+	// 	scene.clearColor = new BABYLON.Color4(0, 0, 0, 0);
+	// 	// Add a camera to the scene and attach it to the canvas
+	// 	var camera = new BABYLON.ArcRotateCamera("Camera", Math.PI / 2, 15 * Math.PI / 32, 25, BABYLON.Vector3.Zero(), scene);
+	// 	camera.attachControl(glCtx, true);
+
+	// 	// Add lights to the scene
+	// 	var light1 = new BABYLON.HemisphericLight("light1", new BABYLON.Vector3(1, 1, 0), scene);
+	// 	var light2 = new BABYLON.PointLight("Omni0", new BABYLON.Vector3(0, 1, -1), scene);
+
+	// 	// GLTFFileLoader.IncrementalLoading = false
+	// 	BABYLON.SceneLoader.Append("assets/gltf/concrete_block/scene.gltf", "", scene, function (scene) {
+	// 		console.log("loaded concrete block!")
+	// 	}, null, null, ".gltf");
+
+	// 	scene.clearColor = new BABYLON.Color4(0, 0, 0, 0);
+
+	// 	return scene;
+	// };
 
 
 	useEffect(() => {
@@ -302,6 +301,9 @@ export const App: VFC = () => {
 
 	const ResetTask = () => {
 		resetCubeTracker()
+		const glCtx = canvasRef2.current!.getContext('webgl', { premultipliedAlpha: false })!
+		var scene = createScene(gEngine, glCtx); //Call the createScene function
+		gScene = scene
 	}
 
 	return (
