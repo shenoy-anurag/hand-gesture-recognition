@@ -4,16 +4,18 @@
 // https://stackoverflow.com/questions/67674453/how-to-run-mediapipe-facemesh-on-a-es6-node-js-environment-alike-react
 // https://www.npmjs.com/package/react-webcam
 
-import React, { useCallback, useEffect, useRef, VFC } from 'react';
+import { useCallback, useEffect, useRef, VFC } from 'react';
 import Webcam from 'react-webcam';
 import { css } from '@emotion/css';
 import { Camera } from '@mediapipe/camera_utils';
 import { Hands, Results } from '@mediapipe/hands';
-import { drawCanvas, drawGLCanvas, resetCubeTracker } from '../utils/drawCanvas';
-// import *  as utils from '../utils/drawCanvas';
+
 import * as BABYLON from 'babylonjs';
-import { Engine, Scene } from 'babylonjs';
 import 'babylonjs-loaders';
+
+// import *  as utils from '../utils/drawCanvas';
+import { drawGLCanvas, resetCubeTracker } from '../utils/drawCanvas';
+import { degrees_to_radians } from '../utils/vectorMath';
 
 
 let gScene: BABYLON.Scene | any
@@ -82,6 +84,22 @@ export const App: VFC = () => {
 		zChar.position = new BABYLON.Vector3(0, 0.05 * size, 0.9 * size);
 	};
 
+	const rotateMesh = (parent_mesh: BABYLON.AbstractMesh, scene: BABYLON.Scene, angles: number[]) => {
+		// Method 1
+		var [x, y, z] = angles
+		var yaw = degrees_to_radians(y);
+		var pitch = degrees_to_radians(x);
+		var roll = degrees_to_radians(z);
+		parent_mesh.rotate(BABYLON.Axis.Y, yaw, BABYLON.Space.LOCAL);
+		parent_mesh.rotate(BABYLON.Axis.X, pitch, BABYLON.Space.LOCAL);
+		parent_mesh.rotate(BABYLON.Axis.Z, roll, BABYLON.Space.LOCAL);
+		// // Method 2 - Using Quarternion
+		// var abcQuaternion = BABYLON.Quaternion.RotationAlphaBetaGamma(alpha, beta, gamma);
+		// var [x, y, z] = angles
+		// var abcQuaternion = BABYLON.Quaternion.RotationYawPitchRoll(y, x, z);
+		// parent_mesh.rotationQuaternion = abcQuaternion;
+	}
+
 	const getProjectedPosition = (scene: BABYLON.Scene) => {
 		let engine = scene.getEngine();
 		let globalViewport = scene.cameras[0].viewport.toGlobal(
@@ -98,6 +116,7 @@ export const App: VFC = () => {
 		return projectedPosition
 	}
 
+	/******* Finds Bounding Info ******/
 	const findBoundingBox2 = (scene: BABYLON.Scene) => {
 		var root_meshes = scene.meshes.filter((x) => {
 			return x.parent == null
@@ -116,7 +135,7 @@ export const App: VFC = () => {
 		const size = max.subtract(min);
 
 		const boundingInfo = new BABYLON.BoundingInfo(min, max);
-		const bbCenterWorld = boundingInfo.boundingBox.centerWorld;
+		// const bbCenterWorld = boundingInfo.boundingBox.centerWorld;
 
 		// const m = BABYLON.MeshBuilder.CreateBox("bounds", { size: 1 }, scene);
 		// m.scaling.copyFrom(size);
@@ -128,9 +147,10 @@ export const App: VFC = () => {
 		// console.log("Height: ", size.y);
 		// console.log("Depth: ", size.z);
 		// console.log("Position: ", bbCenterWorld)
-		return [size, bbCenterWorld, root]
+		return [size, boundingInfo, root]
 	}
 
+	/******* Not working properly, don't use ******/
 	const findBoundingBox = (scene: BABYLON.Scene) => {
 		var root_meshes = scene.meshes.filter((x) => {
 			return x.parent == null
@@ -187,7 +207,10 @@ export const App: VFC = () => {
 		// scene.autoClear = false
 		scene.clearColor = new BABYLON.Color4(0, 0, 0, 0);
 		// Add a camera to the scene and attach it to the canvas
-		var camera = new BABYLON.ArcRotateCamera("Camera", Math.PI / 2, 15 * Math.PI / 32, 25, BABYLON.Vector3.Zero(), scene);
+		// var camera = new BABYLON.ArcRotateCamera("Camera", Math.PI / 2, 15 * Math.PI / 32, 25, BABYLON.Vector3.Zero(), scene);
+		// var camera = new BABYLON.FreeCamera("camera1", new BABYLON.Vector3(0, 5, -10), scene);
+		var camera = new BABYLON.UniversalCamera("UniversalCamera", new BABYLON.Vector3(0, 0, -30), scene);
+		camera.setTarget(BABYLON.Vector3.Zero());
 		camera.attachControl(glCtx, true);
 		camera.maxZ = 100000;
 
@@ -199,16 +222,35 @@ export const App: VFC = () => {
 		BABYLON.SceneLoader.Append("assets/gltf/honda_civic/scene.gltf", "", scene, function (scene) {
 			console.log("loaded model!")
 			// findBoundingBox(scene);
-			var [size, bbCenterWorld, root] = findBoundingBox2(scene)
-			root.position = new BABYLON.Vector3(-10, -5, 0);// position mesh in your scene
+			// small car on the upper right side of screen
+			// var position = [15, 3, 0]
+			// var scaling = [1, 1, 1]
+			// var rotation = [0, -90, 0]
+			// large car
+			var position = [15, 3, 0] // +ve is right side, -ve is left, +ve is up, -ve is down.
+			var scaling = [4, 4, 4] // scaling factors
+			// var rotation = [15, 35, 0] // angles in degrees
+			var rotation = [0, 90, 0]
+			var [size, boundingInfo, root] = findBoundingBox2(scene)
+			root.position = new BABYLON.Vector3(position[0], position[1], position[2]);// position mesh in your scene
+			rotateMesh(root, scene, rotation)
+			root.scaling = new BABYLON.Vector3(scaling[0], scaling[1], scaling[2]);
 		}, null, null, ".gltf");
 
-			// GLTFFileLoader.IncrementalLoading = false
-		BABYLON.SceneLoader.ImportMesh("", "assets/gltf/concrete_block/scene.gltf", "", scene, function (newMeshes) {
-			console.log("loaded concrete block!")
-			newMeshes[0].position = new BABYLON.Vector3(17, -5, 0);// position mesh in your scene
-			newMeshes[0].rotate(BABYLON.Axis.X, 0.3, BABYLON.Space.LOCAL)
-		}, null, null, ".gltf");
+		// BABYLON.SceneLoader.ImportMesh("", "assets/gltf/concrete_block/scene.gltf", "", scene, function (newMeshes) {
+		// 	console.log("loaded concrete block!")
+		// 	// // small block in left edge of screen
+		// 	// var position = [-20, -5, 0]
+		// 	// var scaling = [1, 1, 1]
+		// 	// var rotation = [-10, 0, 0]
+		// 	// large block
+		// 	var position = [-10, -9, 0]
+		// 	var scaling = [7, 7, 7]
+		// 	var rotation = [3, 0, 0]
+		// 	newMeshes[0].position = new BABYLON.Vector3(position[0], position[1], position[2]);// position mesh in your scene
+		// 	rotateMesh(newMeshes[0], scene, rotation)
+		// 	newMeshes[0].scaling = new BABYLON.Vector3(scaling[0], scaling[1], scaling[2]);
+		// }, null, null, ".gltf");
 
 		scene.clearColor = new BABYLON.Color4(0, 0, 0, 0);
 
@@ -247,13 +289,11 @@ export const App: VFC = () => {
 
 		// const glCtx2 = canvasRef3.current!.getContext('webgl', { premultipliedAlpha: false })!
 		/******* End of the create scene function ******/
-		var scene = createScene(gEngine, glCtx); //Call the createScene function
+		gScene = createScene(gEngine, glCtx); //Call the createScene function
 		// var scene2 = createScene2(engine, glCtx2); //Call the createScene function
-		gScene = scene
-
 		gEngine.runRenderLoop(function () { // Register a render loop to repeatedly render the scene
 			console.log("re-render")
-			scene.render();
+			gScene.render();
 			// scene2.render();
 		});
 		// engine.runRenderLoop(function () { // Register a render loop to repeatedly render the scene

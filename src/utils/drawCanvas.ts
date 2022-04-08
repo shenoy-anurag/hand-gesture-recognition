@@ -1,28 +1,9 @@
 // import * as Kalidokit from "kalidokit";
 import { Hand } from "kalidokit";
-import { matrix, multiply, inv, transpose, im } from 'mathjs'
+import { matrix, multiply, inv, transpose } from 'mathjs'
 import { drawConnectors, drawLandmarks } from '@mediapipe/drawing_utils';
 import { HAND_CONNECTIONS, NormalizedLandmarkListList, Results } from '@mediapipe/hands';
-import { start } from "repl";
-
-function calcDistance(x1: number, y1: number, x2: number, y2: number) {
-	const dist = Math.sqrt(Math.pow(x1 - x2, 2) + Math.pow(y1 - y2, 2))
-	return dist
-}
-
-function calcCentroid(points: any[]) {
-	let centerX = 0
-	let centerY = 0
-	let xSum = 0
-	let ySum = 0
-	for (let i = 0; i < points.length; i++) {
-		xSum += points[i][0]
-		ySum += points[i][1]
-	}
-	centerX = xSum / points.length
-	centerY = ySum / points.length
-	return [centerX, centerY]
-}
+import { calcDistance, calcCentroid, degrees_to_radians } from "./vectorMath";
 
 
 class ResultsManager {
@@ -258,6 +239,7 @@ function calcRotation() {
 	rsm.rotationMat = transpose(mulVal)
 }
 
+/******* Finds Bounding Info ******/
 const findBoundingBox2 = (scene: BABYLON.Scene) => {
 	var root_meshes = scene.meshes.filter((x) => {
 		return x.parent == null
@@ -276,14 +258,24 @@ const findBoundingBox2 = (scene: BABYLON.Scene) => {
 	const size = max.subtract(min);
 
 	const boundingInfo = new BABYLON.BoundingInfo(min, max);
-	const bbCenterWorld = boundingInfo.boundingBox.centerWorld;
+	// const bbCenterWorld = boundingInfo.boundingBox.centerWorld;
+	return [size, boundingInfo, root]
+}
 
-	// const m = BABYLON.MeshBuilder.CreateBox("bounds", { size: 1 }, scene);
-	// m.scaling.copyFrom(size);
-	// m.position.copyFrom(bbCenterWorld);
-	// m.visibility = 0.1;
+const getProjectedPosition = (scene: BABYLON.Scene, parent_mesh: BABYLON.AbstractMesh) => {
+	let engine = scene.getEngine();
+	let globalViewport = scene.cameras[0].viewport.toGlobal(
+		engine.getRenderWidth(),
+		engine.getRenderHeight()
+	);
 
-	return [size, bbCenterWorld, root]
+	let projectedPosition = BABYLON.Vector3.Project(
+		parent_mesh.position,
+		BABYLON.Matrix.Identity(),
+		scene.getTransformMatrix(),
+		globalViewport
+	);
+	return projectedPosition
 }
 
 const drawCircle = (ctx: CanvasRenderingContext2D, x: number, y: number, r: number, linewidth?: number, color?: string) => {
@@ -375,10 +367,18 @@ const detectGrabbingCar = (ctx: CanvasRenderingContext2D, handLandmarks: Normali
 			const height = ctx.canvas.height
 			const [x1, y1] = [handLandmarks[0][8].x * width, handLandmarks[0][8].y * height]
 			const [x2, y2] = [handLandmarks[0][4].x * width, handLandmarks[0][4].y * height]
-			let [size, bbCenterWorld, root] = findBoundingBox2(scene)
-			const [xmin, ymin, zmin, xmax, ymax, zmax] = [root.position.x, root.position.y, root.position.z, size[0], size[1], size[2]]
-			console.log("values: ", [xmin, ymin, zmin, xmax, ymax, zmax])
+			let [size, boundingInfo, root] = findBoundingBox2(scene)
+			var projectedPosition = getProjectedPosition(scene, root)
+			console.log("projected pos")
+			console.log(projectedPosition);
+			// console.log("bounding info", boundingInfo)
+			console.log("size", size)
+			const [xmin, ymin, zmin, xmax, ymax, zmax] = [projectedPosition.x, projectedPosition.y, projectedPosition.z, size[0], size[1], size[2]]
+			// console.log("values: ", [xmin, ymin, zmin, xmax, ymax, zmax])
 			carTracker.setValues(xmin, ymin, xmax, ymax, zmin, zmax)
+			// const [xmin, ymin, zmin, xmax, ymax, zmax] = [root.position.x, root.position.y, root.position.z, size[0], size[1], size[2]]
+			// console.log("values: ", [xmin, ymin, zmin, xmax, ymax, zmax])
+			// carTracker.setValues(xmin, ymin, xmax, ymax, zmin, zmax)
 			const dist1 = Math.abs(calcDistance(x1, y1, carTracker.cx, carTracker.cy))
 			const dist2 = Math.abs(calcDistance(x2, y2, carTracker.cx, carTracker.cy))
 			// console.log(dist1, dist2, carTracker.r1, carTracker.r2, carTracker.cx, carTracker.cy)
@@ -390,46 +390,51 @@ const detectGrabbingCar = (ctx: CanvasRenderingContext2D, handLandmarks: Normali
 	return false
 }
 
-export const translateCar = (parent_mesh: any, scene: BABYLON.Scene, carTracker: CarTracker, deviations: number[]) => {
-	// var startPoint = new BABYLON.Vector3(1, 3, 2);
-	// parent_mesh.position = startPoint;
-	// var translateVector = new BABYLON.Vector3(2, 1, 4);
-	// var endPoint = startPoint.add(translateVector);
-	// var distance = translateVector.length();
-	// var direction = new BABYLON.Vector3(translateVector.x, translateVector.y, translateVector.z);
-
+export const translateCar = (parent_mesh: BABYLON.AbstractMesh, scene: BABYLON.Scene, carTracker: CarTracker, deviations: number[]) => {
 	var startPoint = parent_mesh.position;
-	console.log("position", startPoint)
-	parent_mesh.movePOV(deviations[0] / 10, - deviations[1] / 10, 0)
-	parent_mesh.alwaysSelectAsActiveMesh = true
-
-	// scene.onBeforeRenderObservable.add(() => {
-	// 	//code to execute
-	// 	parent_mesh.movePOV(deviations[0], deviations[1], 0)
-	// });
-
-	// var startPoint = parent_mesh.position;
 	// console.log("position", startPoint)
-	// var translateVector = new BABYLON.Vector3(startPoint.x + deviations[0], startPoint.y + deviations[1], startPoint.z + deviations[2]);
-	// var distance = translateVector.length();
-	// var direction = new BABYLON.Vector3(deviations[0], deviations[1], deviations[2]);
-	// direction.normalize();
-	// scene.registerAfterRender(function () {
-	// 	// parent_mesh.translate(direction, distance, BABYLON.Space.WORLD)
-	// 	parent_mesh.translate(BABYLON.Axis.Y, deviations[1], BABYLON.Space.LOCAL);
-	// 	parent_mesh.translate(BABYLON.Axis.X, deviations[0], BABYLON.Space.LOCAL);
-	// })
-	// carTracker.x = startPoint.x
-	// carTracker.y = startPoint.y
-	// carTracker.z = startPoint.z
+	// Method 1
+	// Old one where car was facing us
+	// parent_mesh.movePOV(deviations[0] / 15, - deviations[1] / 15, 0)
+	// New one where car is facing left
+	// parent_mesh.movePOV(0, - deviations[1] / 15, -deviations[0] / 15)
+	// Method 2
+	parent_mesh.translate(BABYLON.Axis.X, -deviations[0] / 15, BABYLON.Space.WORLD);
+	parent_mesh.translate(BABYLON.Axis.Y, -deviations[1] / 15, BABYLON.Space.WORLD);
+	parent_mesh.alwaysSelectAsActiveMesh = true
 	carTracker.position = parent_mesh.position
 }
 
-export const rotateCar = (parent_mesh: any, scene: BABYLON.Scene, carTracker: CarTracker, angles: number[]) => {
-	parent_mesh.rotation.x = angles[0]; //rotation around x axis
-	parent_mesh.rotation.y = angles[1];  //rotation around y axis
-	parent_mesh.rotation.z = angles[2]; //rotation around z axis
-	carTracker.rotation = parent_mesh.rotation
+export const rotateCar = (parent_mesh: BABYLON.Mesh, scene: BABYLON.Scene, carTracker: CarTracker, angles: number[]) => {
+	var [x, y, z] = angles
+	var yaw = degrees_to_radians(y);
+	var pitch = degrees_to_radians(x);
+	var roll = degrees_to_radians(z);
+	parent_mesh.rotate(BABYLON.Axis.Y, yaw, BABYLON.Space.LOCAL);
+	parent_mesh.rotate(BABYLON.Axis.X, pitch, BABYLON.Space.LOCAL);
+	parent_mesh.rotate(BABYLON.Axis.Z, roll, BABYLON.Space.LOCAL);
+	carTracker.rotation = parent_mesh.rotationQuaternion
+}
+const rotateMesh = (parent_mesh: BABYLON.AbstractMesh, scene: BABYLON.Scene, angles: number[]) => {
+	// Method 1
+	var [x, y, z] = angles
+	// var alpha = x * 2 * Math.PI;
+	// var beta = y * 2 * Math.PI;
+	// var gamma = z * 2 * Math.PI;
+	var yaw = degrees_to_radians(y);
+	var pitch = degrees_to_radians(x);
+	var roll = degrees_to_radians(z);
+	// parent_mesh.rotate(BABYLON.Axis.Z, alpha, BABYLON.Space.WORLD);
+	// parent_mesh.rotate(BABYLON.Axis.X, beta, BABYLON.Space.WORLD);
+	// parent_mesh.rotate(BABYLON.Axis.Z, gamma, BABYLON.Space.WORLD);
+	parent_mesh.rotate(BABYLON.Axis.Y, yaw, BABYLON.Space.LOCAL);
+	parent_mesh.rotate(BABYLON.Axis.X, pitch, BABYLON.Space.LOCAL);
+	parent_mesh.rotate(BABYLON.Axis.Z, roll, BABYLON.Space.LOCAL);
+	// // Method 2 - Using Quarternion
+	// var abcQuaternion = BABYLON.Quaternion.RotationAlphaBetaGamma(alpha, beta, gamma);
+	// var [x, y, z] = angles
+	// var abcQuaternion = BABYLON.Quaternion.RotationYawPitchRoll(y, x, z);
+	// parent_mesh.rotationQuaternion = abcQuaternion;
 }
 
 /**
@@ -462,8 +467,8 @@ export const drawGLCanvas = (gl: any, ctx: CanvasRenderingContext2D, results: Re
 		// show the circle based on landmarks
 		// drawCircleBwHands(ctx, results.multiHandLandmarks);
 
-		// const isGrabbingCar = detectGrabbingCar(ctx, results.multiHandLandmarks, scene)
-		// console.log("grabbing car", isGrabbingCar)
+		const isGrabbingCar = detectGrabbingCar(ctx, results.multiHandLandmarks, scene)
+		console.log("grabbing car", isGrabbingCar)
 		// if (isGrabbingCar === true) {
 		// 	// let [xDev, yDev] = calcTranslation(width, height)
 		// 	// console.log(xDev, yDev)
@@ -471,30 +476,30 @@ export const drawGLCanvas = (gl: any, ctx: CanvasRenderingContext2D, results: Re
 		// }
 		let [xDev, yDev] = calcTranslation(width, height)
 		let deviations = [xDev, yDev, 0]
-		console.log("deviations", deviations)
+		// console.log("deviations", deviations)
 		translateCar(parent_mesh, scene, carTracker, deviations)
 
 
-		const isGrabbing = detectGrabbingCube(ctx, results.multiHandLandmarks)
-		console.log(isGrabbing)
-		if (isGrabbing === true) {
-			let [xDev, yDev] = calcTranslation(width, height)
-			console.log(xDev, yDev)
-			cubeTracker.translate(xDev, yDev);
-		}
+		// const isGrabbing = detectGrabbingCube(ctx, results.multiHandLandmarks)
+		// console.log(isGrabbing)
+		// if (isGrabbing === true) {
+		// 	let [xDev, yDev] = calcTranslation(width, height)
+		// 	console.log(xDev, yDev)
+		// 	cubeTracker.translate(xDev, yDev);
+		// }
 
 		if (results.multiHandLandmarks !== undefined && results.multiHandLandmarks.length > 0) {
 			let rightHandRig = Hand.solve(results.multiHandLandmarks[0], "Right")
-			console.log(rightHandRig)
+			// console.log(rightHandRig)
 			var angles = [
 				rightHandRig?.RightWrist.x ? rightHandRig?.RightWrist.x : 0,
 				rightHandRig?.RightWrist.y ? rightHandRig?.RightWrist.y : 0,
 				rightHandRig?.RightWrist.z ? rightHandRig?.RightWrist.z : 0
 			]
-			rotateCar(parent_mesh, scene, carTracker, angles)
+			// rotateCar(parent_mesh, scene, carTracker, angles)
 		}
-		drawCube(ctx, cubeTracker.x, cubeTracker.y, cubeTracker.wx, cubeTracker.wy, cubeTracker.h, cubeTracker.color) // green: #8fce00 red: #cc0000 orange: #ff8200 dark-blue: #2A385B
-		drawCube(ctx, 1000, 200, 100, 100, 100, '#cc0000', '#ffffff', true, false) // green: #8fce00 red: #cc0000 orange: #ff8200 dark-blue: #2A385B
+		// drawCube(ctx, cubeTracker.x, cubeTracker.y, cubeTracker.wx, cubeTracker.wy, cubeTracker.h, cubeTracker.color) // green: #8fce00 red: #cc0000 orange: #ff8200 dark-blue: #2A385B
+		// drawCube(ctx, 1000, 200, 100, 100, 100, '#cc0000', '#ffffff', true, false) // green: #8fce00 red: #cc0000 orange: #ff8200 dark-blue: #2A385B
 	}
 	ctx.restore()
 }
@@ -535,7 +540,7 @@ export const drawCanvas = (ctx: CanvasRenderingContext2D, results: Results) => {
 		}
 		if (results.multiHandLandmarks !== undefined && results.multiHandLandmarks.length > 0) {
 			let rightHandRig = Hand.solve(results.multiHandLandmarks[0], "Right")
-			console.log(rightHandRig)
+			// console.log(rightHandRig)
 		}
 		drawCube(ctx, cubeTracker.x, cubeTracker.y, cubeTracker.wx, cubeTracker.wy, cubeTracker.h, cubeTracker.color) // green: #8fce00 red: #cc0000 orange: #ff8200 dark-blue: #2A385B
 		drawCube(ctx, 1000, 200, 100, 100, 100, '#cc0000', '#ffffff', true, false) // green: #8fce00 red: #cc0000 orange: #ff8200 dark-blue: #2A385B
