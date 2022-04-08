@@ -11,19 +11,12 @@ import { Camera } from '@mediapipe/camera_utils';
 import { Hands, Results } from '@mediapipe/hands';
 import { drawCanvas, drawGLCanvas, initGL, resetCubeTracker, webGLCubeTracker } from '../utils/drawCanvas';
 import *  as utils from '../utils/drawCanvas';
-import { Viewer, GLTFLoaderPlugin, STLLoaderPlugin, CameraControl, Entity, PerformanceModel, math } from "@xeokit/xeokit-sdk";
+import * as BABYLON from 'babylonjs';
+import { Engine, Scene } from 'babylonjs';
+import 'babylonjs-loaders';
 
-let viewer: any
-// let viewer: Viewer
 
-let model_aabb: any
-let car_model: any
-
-// let a: PerformanceModel
-// a.createMesh({
-// 	id: "bounding-box",
-// 	geometryId
-// })
+let gScene: BABYLON.Scene | any
 
 export const App: VFC = () => {
 	const webcamRef = useRef<Webcam>(null)
@@ -40,242 +33,160 @@ export const App: VFC = () => {
 		const canvasCtx = canvasRef.current!.getContext('2d')!
 		const glCtx = canvasRef2.current!.getContext('webgl', { premultipliedAlpha: false })!
 		if (glCtx === null) console.log("No WebGL context!")
+		console.log("in results")
 		// let [pmatrix, vmatrix, mmatrix, i_buffer] = initGL(glCtx);
 		// webGLCubeTracker.Pmatrix = pmatrix
 		// webGLCubeTracker.Vmatrix = vmatrix
 		// webGLCubeTracker.Mmatrix = mmatrix
 		// webGLCubeTracker.index_buffer = i_buffer
-		drawGLCanvas(glCtx, canvasCtx, results, viewer, model_aabb);
+		// findBoundingBox(gScene)
+		findBoundingBox2(gScene)
+		var projectedPosition = getProjectedPosition(gScene)
+		console.log(projectedPosition);
+		drawGLCanvas(glCtx, canvasCtx, results);
 		// if (glCtx === null) drawCanvas(canvasCtx, results);
 		// else drawGLCanvas(glCtx, canvasCtx, results);
 
 
 	}, [])
 
-	useEffect(() => {
-		viewer = new Viewer({
-			// canvasId: "glCanvas",
-			canvasElement: canvasRef2.current!,
-			transparent: true
-		});
+	const getProjectedPosition = (scene: BABYLON.Scene) => {
+		let engine = scene.getEngine();
+        let globalViewport= scene.cameras[0].viewport.toGlobal(
+            engine.getRenderWidth(),
+            engine.getRenderHeight()
+        );
 
-		// viewer.camera.eye = [-3.933, 2.855, 27.018];
-		// viewer.camera.look = [4.400, 3.724, 8.899];
-		// viewer.camera.up = [-0.018, 0.999, 0.039];
+        let projectedPosition = BABYLON.Vector3.Project(
+            new BABYLON.Vector3(1,2,3), 
+            BABYLON.Matrix.Identity(), 
+            scene.getTransformMatrix(), 
+            globalViewport
+        );
+		return projectedPosition
+	}
 
-		// viewer.camera.eye = [0, 0, 0];
-		// viewer.camera.look = [4.400, 3.724, 8.899];
-		// viewer.camera.up = [-0.018, 0.999, 0.039];
-		// viewer.scene.selectedMaterial.fillAlpha = 0.9;
+	const findBoundingBox2 = (scene: BABYLON.Scene) => {
+		var root_meshes = scene.meshes.filter((x) => {
+			return x.parent == null
+		})
+		var root: any = root_meshes[0]
+		let childMeshes = root.getChildMeshes();
+		let min = childMeshes[0].getBoundingInfo().boundingBox.minimumWorld;
+		let max = childMeshes[0].getBoundingInfo().boundingBox.maximumWorld;
+		for (let i = 0; i < childMeshes.length; i++) {
+			let meshMin = childMeshes[i].getBoundingInfo().boundingBox.minimumWorld;
+			let meshMax = childMeshes[i].getBoundingInfo().boundingBox.maximumWorld;
 
-		viewer.camera.eye = [0, 0, 30];
-		viewer.camera.look = [0, 0, 0];
-		viewer.camera.up = [0, 1, 0];
-
-		// Configure camera for a World-space in which +Y is considered "up"
-		viewer.camera.worldAxis = [
-			1, 0, 0,    // Right
-			0, 1, 0,    // Up
-			0, 0, -1     // Forward
-		];
-
-		// // Gimbal lock camera yaw rotation to World +Y axis
-		viewer.camera.gimbalLock = true;
-
-		const gltfLoader = new GLTFLoaderPlugin(viewer);
-
-		// const concrete_block = gltfLoader.load({
-		// 	id: "stage1",
-		// 	src: "assets/gltf/concrete_block/scene.gltf",
-		// 	position: [-30, -5, 0],
-		// 	rotation: [0, -10, 3],
-		// 	scale: [1, 1, 1],
-		// 	edges: true,
-		// 	performance: false
-		// });
-		// concrete_block.on("loaded", () => {
-		// 	viewer.cameraFlight.flyTo(concrete_block);
-		// });
-		// concrete_block.destroy()
-
-		// const car_model = gltfLoader.load({
-		// 	id: "car1",
-		// 	src: "assets/gltf/honda_civic/scene.gltf",
-		// 	position: [0, 0, 0],
-		// 	rotation: [0, 0, 0],
-		// 	scale: [1, 1, 1],
-		// 	edges: true,
-		// 	performance: false
-		// });
-		// car_model.on("loaded", () => {
-		// 	viewer.cameraFlight.flyTo(car_model);
-		// });
-		// console.log(car_model.aabb)
-		// // car_model.destroy()
-
-		car_model = viewer.scene.models["car1"];
-		if (car_model === undefined) {
-			car_model = gltfLoader.load({
-				id: "car1",
-				src: "assets/gltf/ReciprocatingSaw/glTF-MaterialsCommon/ReciprocatingSaw.gltf",
-				position: [0, 0, 0],
-				rotation: [0, 0, 0],
-				scale: [0.2, 0.2, 0.2],
-				edges: true,
-				performance: false,
-				edgeThreshold: [20, 20, 20,]
-			});
-			car_model.on("loaded", () => {
-				viewer.cameraFlight.flyTo(car_model);
-			});
-			// car_model.destroy()
+			min = BABYLON.Vector3.Minimize(min, meshMin);
+			max = BABYLON.Vector3.Maximize(max, meshMax);
 		}
-		console.log("center", math.getAABB2Center(car_model.aabb))
-		// console.log(car_model.aabb)
-		model_aabb = car_model.aabb
-		// car_model.destroy()
+		console.log(min)
+		console.log(max)
+		const size = max.subtract(min);
 
-		viewer.scene.highlightMaterial.fillAlpha = 0.9;
-		viewer.scene.highlightMaterial.edgeAlpha = 0.9;
-		viewer.scene.highlightMaterial.edgeColor = [1, 0, 0];
-		viewer.scene.highlightMaterial.edgeWidth = 10;
+		const boundingInfo = new BABYLON.BoundingInfo(min, max);
+		const bbCenterWorld = boundingInfo.boundingBox.centerWorld;
 
-		viewer.cameraControl.doublePickFlyTo = false
+		const m = BABYLON.MeshBuilder.CreateBox("bounds", { size: 1 }, scene);
+		m.scaling.copyFrom(size);
+		m.position.copyFrom(bbCenterWorld);
+		m.visibility = 0.1;
 
-		// var aabb = viewer.scene.getAABB(["car1"])
+		console.log("Width: ", size.x);
+		console.log("Height: ", size.y);
+		console.log("Depth: ", size.z);
+		console.log("Position: ", bbCenterWorld)
+		return [size, bbCenterWorld]
+	}
 
-		const onHover = viewer.cameraControl.on("hover", (e: any) => {
-			const entity = e.entity; // Entity
-			const canvasPos = e.canvasPos; // 2D canvas position
-			console.log(e)
-			// console.log("entity, pos", entity, canvasPos)
+	const findBoundingBox = (scene: BABYLON.Scene) => {
+		var root_meshes = scene.meshes.filter((x) => {
+			return x.parent == null
+		})
+		var root: any = root_meshes[0]
+		// console.log(root_meshes)
+		// console.log(scene.meshes)
+
+		var min: any = null;
+		var max: any = null;
+		scene.meshes.forEach(function (mesh) {
+			const boundingBox = mesh.getBoundingInfo().boundingBox;
+			if (min === null) {
+				min = new BABYLON.Vector3();
+				min.copyFrom(boundingBox.minimum);
+			}
+
+			if (max === null) {
+				max = new BABYLON.Vector3();
+				max.copyFrom(boundingBox.maximum);
+			}
+
+			min.x = boundingBox.minimum.x < min.x ? boundingBox.minimum.x : min.x;
+			min.y = boundingBox.minimum.y < min.y ? boundingBox.minimum.y : min.y;
+			min.z = boundingBox.minimum.z < min.z ? boundingBox.minimum.z : min.z;
+
+			max.x = boundingBox.maximum.x > max.x ? boundingBox.maximum.x : max.x;
+			max.y = boundingBox.maximum.y > max.y ? boundingBox.maximum.y : max.y;
+			max.z = boundingBox.maximum.z > max.z ? boundingBox.maximum.z : max.z;
+		})
+
+		const size = max.subtract(min);
+
+		const boundingInfo = new BABYLON.BoundingInfo(min, max);
+		const bbCenterWorld = boundingInfo.boundingBox.centerWorld;
+
+		const m = BABYLON.MeshBuilder.CreateBox("bounds", { size: 1 }, scene);
+		m.scaling.copyFrom(size);
+		m.position.copyFrom(bbCenterWorld);
+		m.visibility = 0.12;
+
+		console.log("Width: ", size.x);
+		console.log("Height: ", size.y);
+		console.log("Depth: ", size.z);
+		console.log("Position: ", bbCenterWorld)
+		return [size, bbCenterWorld]
+	}
+
+
+	useEffect(() => {
+		const glCtx = canvasRef2.current!.getContext('webgl', { premultipliedAlpha: false })!
+		var engine = new BABYLON.Engine(glCtx, true); // Generate the BABYLON 3D engine
+
+		/******* Add the create scene function ******/
+		var createScene = function () {
+			// Create the scene space
+			var scene = new BABYLON.Scene(engine);
+
+			// scene.autoClear = false
+			scene.clearColor = new BABYLON.Color4(0, 0, 0, 0);
+			// Add a camera to the scene and attach it to the canvas
+			var camera = new BABYLON.ArcRotateCamera("Camera", Math.PI / 2, 15 * Math.PI / 32, 25, BABYLON.Vector3.Zero(), scene);
+			camera.attachControl(glCtx, true);
+
+			// Add lights to the scene
+			var light1 = new BABYLON.HemisphericLight("light1", new BABYLON.Vector3(1, 1, 0), scene);
+			var light2 = new BABYLON.PointLight("Omni0", new BABYLON.Vector3(0, 1, -1), scene);
+
+			// GLTFFileLoader.IncrementalLoading = false
+			BABYLON.SceneLoader.Append("assets/gltf/honda_civic/scene.gltf", "", scene, function (scene) {
+				console.log("loaded model!")
+				// findBoundingBox(scene);
+				findBoundingBox2(scene)
+			}, null, null, ".gltf");
+
+			scene.clearColor = new BABYLON.Color4(0, 0, 0, 0);
+
+			return scene;
+		};
+
+		/******* End of the create scene function ******/
+		var scene = createScene(); //Call the createScene function
+
+		engine.runRenderLoop(function () { // Register a render loop to repeatedly render the scene
+			gScene = scene
+			scene.render();
 		});
-
-		// console.log("viewer scene aabb", viewer.scene.getAABB(["car1"]))
-		viewer.scene.aabbVisible = true
-
-		viewer.cameraControl.on("picked", (e: any) => {
-			const entity = e.entity;
-			const canvasPos = e.canvasPos;
-			const worldPos = e.worldPos; // 3D World-space position
-			const viewPos = e.viewPos; // 3D View-space position
-			const worldNormal = e.worldNormal; // 3D World-space normal vector
-			console.log("picked", canvasPos, worldPos, viewPos, worldNormal)
-		});
-
-		// viewer.cameraControl.on("hoverEnter", function (hit: any) {
-		// 	console.log("hits", hit)
-		// 	for (var object = hit.entity; object.parent; object = object.parent) {
-		// 		object.aabbVisible = true;
-		// 	}
-		// });
-
-		// viewer.cameraControl.on("hoverOut", function (hit: any) {
-		// 	console.log("hits", hit)
-		// 	for (var object = hit.entity; object.parent; object = object.parent) {
-		// 		object.aabbVisible = false;
-		// 	}
-		// });
-
-		// viewer.cameraControl.on("picked", function (hit: any) {
-		// 	viewer.cameraFlight.flyTo(hit.mesh);
-		// });
-
-		// viewer.cameraControl.on("pickedNothing", function (hit: any) {
-		// 	viewer.cameraFlight.flyTo(car_model);
-		// });
-
-		// viewer.camera.eye = [2, 30, 30];
-		// viewer.camera.look = [0, 0, 10];
-		// viewer.camera.up = [0, 1, 0];
-
-		// // Configure camera for a World-space in which +Y is considered "up"
-		// viewer.camera.worldAxis = [
-		// 	1, 0, 0,    // Right
-		// 	0, 1, 0,    // Up
-		// 	0, 0, -1     // Forward
-		// ];
-
-		// // Gimbal lock camera yaw rotation to World +Y axis
-		// viewer.camera.gimbalLock = true;
-
-		// const gltfLoader = new GLTFLoaderPlugin(viewer);
-		// const concrete_block = gltfLoader.load({
-		// 	id: "stage1",
-		// 	src: "assets/gltf/concrete_block/scene.gltf",
-		// 	position: [-30, -10, 5],
-		// 	rotation: [-45, -10, 3],
-		// 	scale: [1, 1, 1],
-		// 	edges: true,
-		// 	performance: false
-		// });
-		// concrete_block.on("loaded", () => {
-		// 	viewer.cameraFlight.flyTo(concrete_block);
-		// });
-		// // concrete_block.destroy()
-
-		// const car_model = gltfLoader.load({
-		// 	id: "car1",
-		// 	src: "assets/gltf/honda_civic/scene.gltf",
-		// 	position: [0, 0, 0],
-		// 	rotation: [0, 0, 0],
-		// 	scale: [1, 1, 1],
-		// 	edges: true,
-		// 	performance: false
-		// });
-		// car_model.on("loaded", () => {
-		// 	viewer.cameraFlight.flyTo(car_model);
-		// });
-		// console.log(car_model.aabb)
-		// // car_model.destroy()
-
-		// viewer.scene.highlightMaterial.fillAlpha = 0.6;
-		// viewer.scene.highlightMaterial.edgeAlpha = 0.6;
-		// viewer.scene.highlightMaterial.edgeColor = [1, 0, 0];
-		// viewer.scene.highlightMaterial.edgeWidth = 2;
-
-		// const gltfLoader = new GLTFLoaderPlugin(viewer);
-		// const avocado_model = gltfLoader.load({
-		// 	id: "assets/gltf/Avocado/Avocado.gltf",
-		// 	src: "assets/gltf/Avocado/Avocado.gltf",
-		// });
-		// avocado_model.on("loaded", () => {
-		// 	viewer.cameraFlight.flyTo(avocado_model);
-		// });
-		// avocado_model.destroy()
-
-		// const stlLoader = new STLLoaderPlugin(viewer);
-
-		// const geometry_dash_model = stlLoader.load({
-		// 	id: "assets/games/geo-dash.stl",
-		// 	src: "assets/games/geo-dash.stl",
-		// 	position: [0.5, -0.5, 0.2],
-		// 	rotation: [0, 0, -90],
-		// 	scale: [.05, .05, .05]
-		// });
-		// geometry_dash_model.on("loaded", function () { // Model is an Entity
-		// 	viewer.cameraFlight.flyTo(geometry_dash_model);
-		// });
-		// geometry_dash_model.destroy();
-
-		// const cube = stlLoader.load({
-		// 	id: "assets/cube/perfect-cube.stl",
-		// 	src: "assets/cube/perfect-cube.stl",
-		// 	edges: true,
-		// 	smoothNormals: true,
-		// 	position: [25, 15, 5],
-		// 	rotation: [0, 0, -90],
-		// 	scale: [.05, .05, .05]
-		// });
-		// cube.on("loaded", function () { // Model is an Entity
-		// 	viewer.cameraFlight.flyTo(cube);
-		// });
-		// cube.destroy()
-
-		// const rotate = () => {
-		// 	viewer.camera.orbitYaw(-0.2);
-		// }
-		// viewer.scene.on("tick", rotate);
 
 		const hands = new Hands({
 			locateFile: file => {
@@ -304,16 +215,16 @@ export const App: VFC = () => {
 		}
 	}, [onResults])
 
-	// Log to console
-	const OutputData = () => {
-		const results = resultsRef.current!
-		console.log(results.multiHandLandmarks)
-		// setResultsArr([
-		// 	...resultsArr.slice(1, 3),
-		// 	resultsRef.current?.multiHandLandmarks
-		// ]);
-		// console.log(resultsArr)
-	}
+	// // Log to console
+	// const OutputData = () => {
+	// 	const results = resultsRef.current!
+	// 	console.log(results.multiHandLandmarks)
+	// 	// setResultsArr([
+	// 	// 	...resultsArr.slice(1, 3),
+	// 	// 	resultsRef.current?.multiHandLandmarks
+	// 	// ]);
+	// 	// console.log(resultsArr)
+	// }
 
 	const ResetTask = () => {
 		resetCubeTracker()

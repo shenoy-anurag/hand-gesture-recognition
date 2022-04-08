@@ -3,19 +3,6 @@ import { Hand } from "kalidokit";
 import { matrix, multiply, inv, transpose, im } from 'mathjs'
 import { drawConnectors, drawLandmarks } from '@mediapipe/drawing_utils';
 import { HAND_CONNECTIONS, NormalizedLandmarkListList, Results } from '@mediapipe/hands';
-import { Viewer, math } from "@xeokit/xeokit-sdk";
-// import * as xeogl from "xeogl";
-// import * as xeogl from "../../node_modules/xeogl/build/xeogl.js";
-// const xeogl = require('xeogl');
-// import * as xeogl from "xeogl";
-
-
-// var box_model = new xeogl.GLTFModel({
-//     id: "box",
-//     src: "../../models/gltf/shapes/Box.gltf"
-// });
-
-// console.log(box_model)
 
 function calcDistance(x1: number, y1: number, x2: number, y2: number) {
 	const dist = Math.sqrt(Math.pow(x1 - x2, 2) + Math.pow(y1 - y2, 2))
@@ -684,7 +671,7 @@ let time = 0
  * @param gl webgl context
  * @param results mediapipe model results
  */
-export const drawGLCanvas = (gl: any, ctx: CanvasRenderingContext2D, results: Results, viewer: Viewer, model_aabb: any) => {
+export const drawGLCanvas = (gl: any, ctx: CanvasRenderingContext2D, results: Results) => {
 	rsm.setResultsArr(results.multiHandLandmarks)
 	rsm.setResultsWorldArr(results.multiHandWorldLandmarks)
 	// console.log(rsm.resultsArr)
@@ -717,25 +704,15 @@ export const drawGLCanvas = (gl: any, ctx: CanvasRenderingContext2D, results: Re
 		}
 		// show the circle based on landmarks
 		// drawCircleBwHands(ctx, results.multiHandLandmarks);
-		console.log(viewer.scene.modelIds)
-		// console.log(model_aabb)
-		// console.log("viewer scene aabb 2222", viewer.scene.getAABB(["car1"]))
-		const car_model = viewer.scene.models["car1"];
-		if (car_model) {
-			// console.log("car highlighted: ", car_model.highlighted, car_model.pickable)
-			console.log("car model", car_model.aabb)
-			console.log("center", math.getAABB2Center(car_model.aabb))
-			// console.log("full scene aabb", viewer.scene.aabb)
-			const isGrabbingCar = detectGrabbingCar(ctx, results.multiHandLandmarks, car_model)
-			console.log("grabbing car", isGrabbingCar)
-			console.log(viewer.scene.highlightedObjectIds)
-			if (isGrabbingCar === true) {
-				let [xDev, yDev] = calcTranslation(width, height)
-				console.log(xDev, yDev)
-				carTracker.translate(xDev, yDev);
-			}
-			// car_model.destroy()
-		}
+
+		// const isGrabbingCar = detectGrabbingCar(ctx, results.multiHandLandmarks, car_model)
+		// 	console.log("grabbing car", isGrabbingCar)
+		// 	if (isGrabbingCar === true) {
+		// 		let [xDev, yDev] = calcTranslation(width, height)
+		// 		console.log(xDev, yDev)
+		// 		carTracker.translate(xDev, yDev);
+		// 	}
+		// }
 
 		const isGrabbing = detectGrabbingCube(ctx, results.multiHandLandmarks)
 		console.log(isGrabbing)
