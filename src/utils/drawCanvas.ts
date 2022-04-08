@@ -3,6 +3,7 @@ import { Hand } from "kalidokit";
 import { matrix, multiply, inv, transpose, im } from 'mathjs'
 import { drawConnectors, drawLandmarks } from '@mediapipe/drawing_utils';
 import { HAND_CONNECTIONS, NormalizedLandmarkListList, Results } from '@mediapipe/hands';
+import { start } from "repl";
 
 function calcDistance(x1: number, y1: number, x2: number, y2: number) {
 	const dist = Math.sqrt(Math.pow(x1 - x2, 2) + Math.pow(y1 - y2, 2))
@@ -117,6 +118,7 @@ let cubeTracker = new CubeTracker(300, 300, 50, 50, 50, '#ff8200', '#ff6000')
 class CarTracker {
 	x: number
 	y: number
+	z: number
 	wx: number
 	wy: number
 	h: number
@@ -126,11 +128,14 @@ class CarTracker {
 	r: number
 	r1: number
 	r2: number
+	position: any
+	rotation: any
 	// [xmin, ymin,zmin,xmax,ymax, zmax]
 
-	constructor(x: number, y: number, wx: number, wy: number, h: number) {
+	constructor(x: number, y: number, z: number, wx: number, wy: number, h: number) {
 		this.x = x
 		this.y = y
+		this.z = z
 		this.wx = wx
 		this.wy = wy
 		this.h = h
@@ -140,11 +145,14 @@ class CarTracker {
 		this.r = r
 		this.r1 = r + h
 		this.r2 = r - h
+		this.position = null
+		this.rotation = null
 	}
 
 	setValues(xmin: number, ymin: number, xmax: number, ymax: number, zmin: number, zmax: number) {
 		this.x = xmin
 		this.y = ymin
+		this.z = zmin
 		this.wx = xmax - xmin
 		this.wy = ymax - ymin
 		this.h = zmax - zmin
@@ -173,7 +181,7 @@ class CarTracker {
 	}
 }
 
-let carTracker = new CarTracker(300, 300, 50, 50, 50)
+let carTracker = new CarTracker(300, 300, 50, 50, 50, 50)
 
 
 function calcTranslation(width: number, height: number) {
@@ -249,8 +257,6 @@ function calcRotation() {
 	mulVal = multiply(mulVal, mat2)
 	rsm.rotationMat = transpose(mulVal)
 }
-
-
 
 const drawCircle = (ctx: CanvasRenderingContext2D, x: number, y: number, r: number, linewidth?: number, color?: string) => {
 	ctx.strokeStyle = color ? color : '#0082cf'
@@ -354,324 +360,54 @@ const detectGrabbingCar = (ctx: CanvasRenderingContext2D, handLandmarks: Normali
 	return false
 }
 
+export const translateCar = (parent_mesh: any, scene: BABYLON.Scene, carTracker: CarTracker, deviations: number[]) => {
+	// var startPoint = new BABYLON.Vector3(1, 3, 2);
+	// parent_mesh.position = startPoint;
+	// var translateVector = new BABYLON.Vector3(2, 1, 4);
+	// var endPoint = startPoint.add(translateVector);
+	// var distance = translateVector.length();
+	// var direction = new BABYLON.Vector3(translateVector.x, translateVector.y, translateVector.z);
 
+	var startPoint = parent_mesh.position;
+	console.log("position", startPoint)
+	parent_mesh.movePOV(deviations[0] / 10, - deviations[1] / 10, 0)
+	parent_mesh.alwaysSelectAsActiveMesh = true
 
-const cubePositions = [
-	// Front face
-	-1.0, -1.0, 1.0,
-	1.0, -1.0, 1.0,
-	1.0, 1.0, 1.0,
-	-1.0, 1.0, 1.0,
+	// scene.onBeforeRenderObservable.add(() => {
+	// 	//code to execute
+	// 	parent_mesh.movePOV(deviations[0], deviations[1], 0)
+	// });
 
-	// Back face
-	-1.0, -1.0, -1.0,
-	-1.0, 1.0, -1.0,
-	1.0, 1.0, -1.0,
-	1.0, -1.0, -1.0,
-
-	// Top face
-	-1.0, 1.0, -1.0,
-	-1.0, 1.0, 1.0,
-	1.0, 1.0, 1.0,
-	1.0, 1.0, -1.0,
-
-	// Bottom face
-	-1.0, -1.0, -1.0,
-	1.0, -1.0, -1.0,
-	1.0, -1.0, 1.0,
-	-1.0, -1.0, 1.0,
-
-	// Right face
-	1.0, -1.0, -1.0,
-	1.0, 1.0, -1.0,
-	1.0, 1.0, 1.0,
-	1.0, -1.0, 1.0,
-
-	// Left face
-	-1.0, -1.0, -1.0,
-	-1.0, -1.0, 1.0,
-	-1.0, 1.0, 1.0,
-	-1.0, 1.0, -1.0,
-];
-
-
-
-var vertices = [
-	-1, -1, -1, 1, -1, -1, 1, 1, -1, -1, 1, -1,
-	-1, -1, 1, 1, -1, 1, 1, 1, 1, -1, 1, 1,
-	-1, -1, -1, -1, 1, -1, -1, 1, 1, -1, -1, 1,
-	1, -1, -1, 1, 1, -1, 1, 1, 1, 1, -1, 1,
-	-1, -1, -1, -1, -1, 1, 1, -1, 1, 1, -1, -1,
-	-1, 1, -1, -1, 1, 1, 1, 1, 1, 1, 1, -1,
-];
-
-var colors = [
-	5, 3, 7, 5, 3, 7, 5, 3, 7, 5, 3, 7,
-	1, 1, 3, 1, 1, 3, 1, 1, 3, 1, 1, 3,
-	0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1,
-	1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0,
-	1, 1, 0, 1, 1, 0, 1, 1, 0, 1, 1, 0,
-	0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0
-];
-
-var indices = [
-	0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7,
-	8, 9, 10, 8, 10, 11, 12, 13, 14, 12, 14, 15,
-	16, 17, 18, 16, 18, 19, 20, 21, 22, 20, 22, 23
-];
-
-function get_projection(angle: number, a: number, zMin: number, zMax: number) {
-	var ang = Math.tan((angle * .5) * Math.PI / 180);//angle*.5
-	return [
-		0.5 / ang, 0, 0, 0,
-		0, 0.5 * a / ang, 0, 0,
-		0, 0, -(zMax + zMin) / (zMax - zMin), -1,
-		0, 0, (-2 * zMax * zMin) / (zMax - zMin), 0
-	];
+	// var startPoint = parent_mesh.position;
+	// console.log("position", startPoint)
+	// var translateVector = new BABYLON.Vector3(startPoint.x + deviations[0], startPoint.y + deviations[1], startPoint.z + deviations[2]);
+	// var distance = translateVector.length();
+	// var direction = new BABYLON.Vector3(deviations[0], deviations[1], deviations[2]);
+	// direction.normalize();
+	// scene.registerAfterRender(function () {
+	// 	// parent_mesh.translate(direction, distance, BABYLON.Space.WORLD)
+	// 	parent_mesh.translate(BABYLON.Axis.Y, deviations[1], BABYLON.Space.LOCAL);
+	// 	parent_mesh.translate(BABYLON.Axis.X, deviations[0], BABYLON.Space.LOCAL);
+	// })
+	// carTracker.x = startPoint.x
+	// carTracker.y = startPoint.y
+	// carTracker.z = startPoint.z
+	carTracker.position = parent_mesh.position
 }
 
-var mo_matrix = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
-var view_matrix = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
-
-class WebGLCubeTracker {
-	cubePositions: any
-	vertices: any
-	colors: any
-	indices: any
-	Pmatrix: any
-	Vmatrix: any
-	Mmatrix: any
-	index_buffer: any
-	proj_matrix: any
-	mo_matrix: number[]
-	view_matrix: number[]
-
-	constructor(cubePositions: any, vertices: any, colors: any, indices: any, mo_matrix: any, view_matrix: any, width: number, height: number) {
-		this.cubePositions = cubePositions
-		this.vertices = vertices
-		this.colors = colors
-		this.indices = indices
-		this.proj_matrix = get_projection(40, width / height, 1, 100);
-		this.mo_matrix = mo_matrix
-		this.view_matrix = view_matrix
-		this.view_matrix[14] = this.view_matrix[14] - 6;
-	}
+export const rotateCar = (parent_mesh: any, scene: BABYLON.Scene, carTracker: CarTracker, angles: number[]) => {
+	parent_mesh.rotation.x = angles[0]; //rotation around x axis
+	parent_mesh.rotation.y = angles[1];  //rotation around y axis
+	parent_mesh.rotation.z = angles[2]; //rotation around z axis
+	carTracker.rotation = parent_mesh.rotation
 }
-
-export let webGLCubeTracker = new WebGLCubeTracker(cubePositions, vertices, colors, indices, mo_matrix, view_matrix, 1280, 720)
-
-export const initGL = (gl: WebGLRenderingContext) => {
-	// Create and store data into vertex buffer
-	var vertex_buffer = gl.createBuffer();
-	gl.bindBuffer(gl.ARRAY_BUFFER, vertex_buffer);
-	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
-
-	// Create and store data into color buffer
-	var color_buffer = gl.createBuffer();
-	gl.bindBuffer(gl.ARRAY_BUFFER, color_buffer);
-	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(colors), gl.STATIC_DRAW);
-
-	// Create and store data into index buffer
-	var index_buffer = gl.createBuffer();
-	gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, index_buffer);
-	gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indices), gl.STATIC_DRAW);
-
-	/*=================== SHADERS =================== */
-
-	var vertCode = 'attribute vec3 position;' +
-		'uniform mat4 Pmatrix;' +
-		'uniform mat4 Vmatrix;' +
-		'uniform mat4 Mmatrix;' +
-		'attribute vec3 color;' +//the color of the point
-		'varying vec3 vColor;' +
-		'void main(void) { ' +//pre-built function
-		'gl_Position = Pmatrix*Vmatrix*Mmatrix*vec4(position, 1.);' +
-		'vColor = color;' +
-		'}';
-
-	var fragCode = 'precision mediump float;' +
-		'varying vec3 vColor;' +
-		'void main(void) {' +
-		'gl_FragColor = vec4(vColor, 1.);' +
-		'}';
-
-	var vertShader = gl.createShader(gl.VERTEX_SHADER);
-	if (vertShader !== null) gl.shaderSource(vertShader, vertCode);
-	if (vertShader !== null) gl.compileShader(vertShader);
-
-	var fragShader = gl.createShader(gl.FRAGMENT_SHADER);
-	if (fragShader !== null) gl.shaderSource(fragShader, fragCode);
-	if (fragShader !== null) gl.compileShader(fragShader);
-
-	var shaderprogram = gl.createProgram();
-	if (shaderprogram !== null && vertShader !== null) gl.attachShader(shaderprogram, vertShader);
-	if (shaderprogram !== null && fragShader !== null) gl.attachShader(shaderprogram, fragShader);
-	if (shaderprogram !== null) gl.linkProgram(shaderprogram);
-
-	/*======== Associating attributes to vertex shader =====*/
-	if (shaderprogram !== null) {
-		var _Pmatrix = gl.getUniformLocation(shaderprogram, "Pmatrix");
-		var _Vmatrix = gl.getUniformLocation(shaderprogram, "Vmatrix");
-		var _Mmatrix = gl.getUniformLocation(shaderprogram, "Mmatrix");
-
-		gl.bindBuffer(gl.ARRAY_BUFFER, vertex_buffer);
-		var _position = gl.getAttribLocation(shaderprogram, "position");
-		gl.vertexAttribPointer(_position, 3, gl.FLOAT, false, 0, 0);
-		gl.enableVertexAttribArray(_position);
-
-		gl.bindBuffer(gl.ARRAY_BUFFER, color_buffer);
-		var _color = gl.getAttribLocation(shaderprogram, "color");
-		gl.vertexAttribPointer(_color, 3, gl.FLOAT, false, 0, 0);
-		gl.enableVertexAttribArray(_color);
-		gl.useProgram(shaderprogram);
-		return [_Pmatrix, _Vmatrix, _Mmatrix, index_buffer]
-	}
-	return [null, null, null, null]
-}
-
-export const drawGLCube = (gl: WebGLRenderingContext) => {
-	/*==================== MATRIX ====================== */
-	const width = gl.canvas.width
-	const height = gl.canvas.height
-
-	var proj_matrix = get_projection(40, width / height, 1, 100);
-	/*=========================rotation================*/
-
-	function rotateX(m: any, angle: number) {
-		var c = Math.cos(angle);
-		var s = Math.sin(angle);
-		var mv1 = m[1], mv5 = m[5], mv9 = m[9];
-
-		m[1] = m[1] * c - m[2] * s;
-		m[5] = m[5] * c - m[6] * s;
-		m[9] = m[9] * c - m[10] * s;
-
-		m[2] = m[2] * c + mv1 * s;
-		m[6] = m[6] * c + mv5 * s;
-		m[10] = m[10] * c + mv9 * s;
-	}
-
-	function rotateY(m: any, angle: number) {
-		var c = Math.cos(angle);
-		var s = Math.sin(angle);
-		var mv0 = m[0], mv4 = m[4], mv8 = m[8];
-
-		m[0] = c * m[0] + s * m[2];
-		m[4] = c * m[4] + s * m[6];
-		m[8] = c * m[8] + s * m[10];
-
-		m[2] = c * m[2] - s * mv0;
-		m[6] = c * m[6] - s * mv4;
-		m[10] = c * m[10] - s * mv8;
-	}
-
-	/*================= Mouse events ======================*/
-
-	var AMORTIZATION = 0.95;
-	var drag = false;
-	var old_x: number;
-	var old_y: number;
-	var dX = 0, dY = 0;
-
-	var mouseDown = function (e: any) {
-		drag = true;
-		old_x = e.pageX;
-		old_y = e.pageY;
-		e.preventDefault();
-		return false;
-	};
-
-	var mouseUp = function (e: any) {
-		drag = false;
-	};
-
-	var mouseMove = function (e: any) {
-		if (!drag) return false;
-		dX = (e.pageX - old_x) * 2 * Math.PI / width;
-		dY = (e.pageY - old_y) * 2 * Math.PI / height;
-		THETA += dX;
-		PHI += dY;
-		old_x = e.pageX
-		old_y = e.pageY;
-		e.preventDefault();
-	};
-
-	gl.canvas.addEventListener("mousedown", mouseDown, false);
-	gl.canvas.addEventListener("mouseup", mouseUp, false);
-	gl.canvas.addEventListener("mouseout", mouseUp, false);
-	gl.canvas.addEventListener("mousemove", mouseMove, false);
-
-	/*=================== Drawing =================== */
-
-	var THETA = 0,
-		PHI = 0;
-	var time_old = 0;
-
-	var animate = function (time: number) {
-		var dt = time - time_old;
-
-		if (!drag) {
-			dX *= AMORTIZATION;
-			dY *= AMORTIZATION;
-			THETA += dX;
-			PHI += dY;
-		}
-
-		//set model matrix to I4
-
-		mo_matrix[0] = 1
-		mo_matrix[1] = 0
-		mo_matrix[2] = 0
-		mo_matrix[3] = 0
-
-		mo_matrix[4] = 0
-		mo_matrix[5] = 1
-		mo_matrix[6] = 0
-		mo_matrix[7] = 0
-
-		mo_matrix[8] = 0
-		mo_matrix[9] = 0
-		mo_matrix[10] = 1
-		mo_matrix[11] = 0
-
-		mo_matrix[12] = 0
-		mo_matrix[13] = 0
-		mo_matrix[14] = 0
-		mo_matrix[15] = 1
-
-		rotateY(mo_matrix, THETA);
-		rotateX(mo_matrix, PHI);
-
-		time_old = time;
-		gl.enable(gl.DEPTH_TEST);
-
-		// gl.depthFunc(gl.LEQUAL);
-
-		// gl.clearColor(0.5, 0.5, 0.5, 0.9);
-		gl.clearColor(0.0, 0, 0, 0);
-		gl.clearDepth(1.0);
-		gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-		gl.viewport(0.0, 0.0, width, height);
-
-		gl.uniformMatrix4fv(webGLCubeTracker.Pmatrix, false, proj_matrix);
-		gl.uniformMatrix4fv(webGLCubeTracker.Vmatrix, false, view_matrix);
-		gl.uniformMatrix4fv(webGLCubeTracker.Mmatrix, false, mo_matrix);
-
-		gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, webGLCubeTracker.index_buffer);
-		gl.drawElements(gl.TRIANGLES, indices.length, gl.UNSIGNED_SHORT, 0);
-		window.requestAnimationFrame(animate);
-	}
-	return animate
-}
-
-let time = 0
 
 /**
  * @param ctx canvas context
  * @param gl webgl context
  * @param results mediapipe model results
  */
-export const drawGLCanvas = (gl: any, ctx: CanvasRenderingContext2D, results: Results) => {
+export const drawGLCanvas = (gl: any, ctx: CanvasRenderingContext2D, results: Results, scene: BABYLON.Scene, parent_mesh: any) => {
 	rsm.setResultsArr(results.multiHandLandmarks)
 	rsm.setResultsWorldArr(results.multiHandWorldLandmarks)
 	// console.log(rsm.resultsArr)
@@ -685,15 +421,6 @@ export const drawGLCanvas = (gl: any, ctx: CanvasRenderingContext2D, results: Re
 	ctx.translate(-width, 0)
 	// show image
 	ctx.drawImage(results.image, 0, 0, width, height)
-
-	// let [Pmatrix, Vmatrix, Mmatrix, index_buffer] = initGL(gl);
-	// webGLCubeTracker.Pmatrix = Pmatrix
-	// webGLCubeTracker.Vmatrix = Vmatrix
-	// webGLCubeTracker.Mmatrix = Mmatrix
-	// webGLCubeTracker.index_buffer = index_buffer
-	// let animate = drawGLCube(gl);
-	// animate(++time);
-
 
 	// show hand landmarks
 	if (results.multiHandLandmarks) {
@@ -713,6 +440,11 @@ export const drawGLCanvas = (gl: any, ctx: CanvasRenderingContext2D, results: Re
 		// 		carTracker.translate(xDev, yDev);
 		// 	}
 		// }
+		let [xDev, yDev] = calcTranslation(width, height)
+		let deviations = [xDev, yDev, 0]
+		console.log("deviations", deviations)
+		translateCar(parent_mesh, scene, carTracker, deviations)
+
 
 		const isGrabbing = detectGrabbingCube(ctx, results.multiHandLandmarks)
 		console.log(isGrabbing)
@@ -725,6 +457,12 @@ export const drawGLCanvas = (gl: any, ctx: CanvasRenderingContext2D, results: Re
 		if (results.multiHandLandmarks !== undefined && results.multiHandLandmarks.length > 0) {
 			let rightHandRig = Hand.solve(results.multiHandLandmarks[0], "Right")
 			console.log(rightHandRig)
+			var angles = [
+				rightHandRig?.RightWrist.x ? rightHandRig?.RightWrist.x : 0, 
+				rightHandRig?.RightWrist.y ? rightHandRig?.RightWrist.y : 0, 
+				rightHandRig?.RightWrist.z ? rightHandRig?.RightWrist.z : 0
+			]
+			rotateCar(parent_mesh, scene, carTracker, angles)
 		}
 		drawCube(ctx, cubeTracker.x, cubeTracker.y, cubeTracker.wx, cubeTracker.wy, cubeTracker.h, cubeTracker.color) // green: #8fce00 red: #cc0000 orange: #ff8200 dark-blue: #2A385B
 		drawCube(ctx, 1000, 200, 100, 100, 100, '#cc0000', '#ffffff', true, false) // green: #8fce00 red: #cc0000 orange: #ff8200 dark-blue: #2A385B
@@ -776,25 +514,25 @@ export const drawCanvas = (ctx: CanvasRenderingContext2D, results: Results) => {
 	ctx.restore()
 }
 
-/**
- * @param ctx
- * @param handLandmarks
- */
-const drawCircleBwHands = (ctx: CanvasRenderingContext2D, handLandmarks: NormalizedLandmarkListList) => {
-	if (handLandmarks.length === 2 && handLandmarks[0].length > 8 && handLandmarks[1].length > 8) {
-		const width = ctx.canvas.width
-		const height = ctx.canvas.height
-		const [x1, y1] = [handLandmarks[0][8].x * width, handLandmarks[0][8].y * height]
-		const [x2, y2] = [handLandmarks[1][8].x * width, handLandmarks[1][8].y * height]
-		const x = (x1 + x2) / 2
-		const y = (y1 + y2) / 2
-		const r = Math.sqrt(Math.pow(x1 - x2, 2) + Math.pow(y1 - y2, 2)) / 2
+// /**
+//  * @param ctx
+//  * @param handLandmarks
+//  */
+// const drawCircleBwHands = (ctx: CanvasRenderingContext2D, handLandmarks: NormalizedLandmarkListList) => {
+// 	if (handLandmarks.length === 2 && handLandmarks[0].length > 8 && handLandmarks[1].length > 8) {
+// 		const width = ctx.canvas.width
+// 		const height = ctx.canvas.height
+// 		const [x1, y1] = [handLandmarks[0][8].x * width, handLandmarks[0][8].y * height]
+// 		const [x2, y2] = [handLandmarks[1][8].x * width, handLandmarks[1][8].y * height]
+// 		const x = (x1 + x2) / 2
+// 		const y = (y1 + y2) / 2
+// 		const r = Math.sqrt(Math.pow(x1 - x2, 2) + Math.pow(y1 - y2, 2)) / 2
 
-		ctx.strokeStyle = '#0082cf'
-		ctx.lineWidth = 5
-		ctx.beginPath()
-		ctx.arc(x, y, r, 0, Math.PI * 2, true)
-		ctx.stroke()
-	}
-}
+// 		ctx.strokeStyle = '#0082cf'
+// 		ctx.lineWidth = 5
+// 		ctx.beginPath()
+// 		ctx.arc(x, y, r, 0, Math.PI * 2, true)
+// 		ctx.stroke()
+// 	}
+// }
 
