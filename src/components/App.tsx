@@ -11,13 +11,19 @@ import { Camera } from '@mediapipe/camera_utils';
 import { Hands, Results } from '@mediapipe/hands';
 import { drawCanvas, drawGLCanvas, initGL, resetCubeTracker, webGLCubeTracker } from '../utils/drawCanvas';
 import *  as utils from '../utils/drawCanvas';
-import { Viewer, GLTFLoaderPlugin, STLLoaderPlugin, CameraControl } from "@xeokit/xeokit-sdk";
+import { Viewer, GLTFLoaderPlugin, STLLoaderPlugin, CameraControl, Entity, PerformanceModel, math } from "@xeokit/xeokit-sdk";
 
 let viewer: any
 // let viewer: Viewer
 
 let model_aabb: any
+let car_model: any
 
+// let a: PerformanceModel
+// a.createMesh({
+// 	id: "bounding-box",
+// 	geometryId
+// })
 
 export const App: VFC = () => {
 	const webcamRef = useRef<Webcam>(null)
@@ -92,36 +98,41 @@ export const App: VFC = () => {
 		// });
 		// concrete_block.destroy()
 
-		const car_model = gltfLoader.load({
-			id: "car1",
-			src: "assets/gltf/honda_civic/scene.gltf",
-			position: [0, 0, 0],
-			rotation: [0, 0, 0],
-			scale: [1, 1, 1],
-			edges: true,
-			performance: false
-		});
-		car_model.on("loaded", () => {
-			viewer.cameraFlight.flyTo(car_model);
-		});
-		console.log(car_model.aabb)
-		// car_model.destroy()
-
 		// const car_model = gltfLoader.load({
 		// 	id: "car1",
-		// 	src: "assets/gltf/ReciprocatingSaw/glTF-MaterialsCommon/ReciprocatingSaw.gltf",
+		// 	src: "assets/gltf/honda_civic/scene.gltf",
 		// 	position: [0, 0, 0],
 		// 	rotation: [0, 0, 0],
 		// 	scale: [1, 1, 1],
 		// 	edges: true,
-		// 	performance: false,
-		// 	edgeThreshold: [20, 20, 20, 0]
+		// 	performance: false
 		// });
 		// car_model.on("loaded", () => {
 		// 	viewer.cameraFlight.flyTo(car_model);
 		// });
 		// console.log(car_model.aabb)
-		// model_aabb = car_model.aabb
+		// // car_model.destroy()
+
+		car_model = viewer.scene.models["car1"];
+		if (car_model === undefined) {
+			car_model = gltfLoader.load({
+				id: "car1",
+				src: "assets/gltf/ReciprocatingSaw/glTF-MaterialsCommon/ReciprocatingSaw.gltf",
+				position: [0, 0, 0],
+				rotation: [0, 0, 0],
+				scale: [0.2, 0.2, 0.2],
+				edges: true,
+				performance: false,
+				edgeThreshold: [20, 20, 20,]
+			});
+			car_model.on("loaded", () => {
+				viewer.cameraFlight.flyTo(car_model);
+			});
+			// car_model.destroy()
+		}
+		console.log("center", math.getAABB2Center(car_model.aabb))
+		// console.log(car_model.aabb)
+		model_aabb = car_model.aabb
 		// car_model.destroy()
 
 		viewer.scene.highlightMaterial.fillAlpha = 0.9;
@@ -138,7 +149,19 @@ export const App: VFC = () => {
 			const canvasPos = e.canvasPos; // 2D canvas position
 			console.log(e)
 			// console.log("entity, pos", entity, canvasPos)
-	   });
+		});
+
+		// console.log("viewer scene aabb", viewer.scene.getAABB(["car1"]))
+		viewer.scene.aabbVisible = true
+
+		viewer.cameraControl.on("picked", (e: any) => {
+			const entity = e.entity;
+			const canvasPos = e.canvasPos;
+			const worldPos = e.worldPos; // 3D World-space position
+			const viewPos = e.viewPos; // 3D View-space position
+			const worldNormal = e.worldNormal; // 3D World-space normal vector
+			console.log("picked", canvasPos, worldPos, viewPos, worldNormal)
+		});
 
 		// viewer.cameraControl.on("hoverEnter", function (hit: any) {
 		// 	console.log("hits", hit)
