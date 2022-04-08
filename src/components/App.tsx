@@ -16,6 +16,9 @@ import { Viewer, GLTFLoaderPlugin, STLLoaderPlugin, CameraControl } from "@xeoki
 let viewer: any
 // let viewer: Viewer
 
+let model_aabb: any
+
+
 export const App: VFC = () => {
 	const webcamRef = useRef<Webcam>(null)
 	const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -36,11 +39,11 @@ export const App: VFC = () => {
 		// webGLCubeTracker.Vmatrix = vmatrix
 		// webGLCubeTracker.Mmatrix = mmatrix
 		// webGLCubeTracker.index_buffer = i_buffer
-		drawGLCanvas(glCtx, canvasCtx, results);
+		drawGLCanvas(glCtx, canvasCtx, results, viewer, model_aabb);
 		// if (glCtx === null) drawCanvas(canvasCtx, results);
 		// else drawGLCanvas(glCtx, canvasCtx, results);
 
-		
+
 	}, [])
 
 	useEffect(() => {
@@ -54,40 +57,159 @@ export const App: VFC = () => {
 		// viewer.camera.look = [4.400, 3.724, 8.899];
 		// viewer.camera.up = [-0.018, 0.999, 0.039];
 
-		viewer.camera.eye = [0, 0, 0];
-		viewer.camera.look = [4.400, 3.724, 8.899];
-		viewer.camera.up = [-0.018, 0.999, 0.039];
-		viewer.scene.selectedMaterial.fillAlpha = 0.9;
+		// viewer.camera.eye = [0, 0, 0];
+		// viewer.camera.look = [4.400, 3.724, 8.899];
+		// viewer.camera.up = [-0.018, 0.999, 0.039];
+		// viewer.scene.selectedMaterial.fillAlpha = 0.9;
+
+		viewer.camera.eye = [0, 0, 30];
+		viewer.camera.look = [0, 0, 0];
+		viewer.camera.up = [0, 1, 0];
+
+		// Configure camera for a World-space in which +Y is considered "up"
+		viewer.camera.worldAxis = [
+			1, 0, 0,    // Right
+			0, 1, 0,    // Up
+			0, 0, -1     // Forward
+		];
+
+		// // Gimbal lock camera yaw rotation to World +Y axis
+		viewer.camera.gimbalLock = true;
 
 		const gltfLoader = new GLTFLoaderPlugin(viewer);
-		// const box_model = gltfLoader.load({
-		// 	id: "assets/gltf/shapes/Box0.bin",
-		// 	src: "assets/gltf/shapes/Box.gltf",
-		// 	position: [25, 15, 5],
-		// 	rotation: [0, 0, -90],
+
+		// const concrete_block = gltfLoader.load({
+		// 	id: "stage1",
+		// 	src: "assets/gltf/concrete_block/scene.gltf",
+		// 	position: [-30, -5, 0],
+		// 	rotation: [0, -10, 3],
 		// 	scale: [1, 1, 1],
 		// 	edges: true,
+		// 	performance: false
 		// });
-		// box_model.on("loaded", () => {
-		// 	viewer.cameraFlight.flyTo(box_model);
+		// concrete_block.on("loaded", () => {
+		// 	viewer.cameraFlight.flyTo(concrete_block);
 		// });
-		// console.log("numPoints", box_model.visible)
-		// box_model.destroy()
+		// concrete_block.destroy()
 
-		const box_model = gltfLoader.load({
-			id: "box1",
-			src: "assets/gltf/shapes/BoxTextured.gltf",
-			position: [25, 15, 5],
-			rotation: [0, 0, -90],
-			scale: [10, 10, 10],
+		const car_model = gltfLoader.load({
+			id: "car1",
+			src: "assets/gltf/honda_civic/scene.gltf",
+			position: [0, 0, 0],
+			rotation: [0, 0, 0],
+			scale: [1, 1, 1],
 			edges: true,
 			performance: false
 		});
-		box_model.on("loaded", () => {
-			viewer.cameraFlight.flyTo(box_model);
+		car_model.on("loaded", () => {
+			viewer.cameraFlight.flyTo(car_model);
 		});
-		console.log("numPoints", box_model.visible)
-		box_model.destroy()
+		console.log(car_model.aabb)
+		// car_model.destroy()
+
+		// const car_model = gltfLoader.load({
+		// 	id: "car1",
+		// 	src: "assets/gltf/ReciprocatingSaw/glTF-MaterialsCommon/ReciprocatingSaw.gltf",
+		// 	position: [0, 0, 0],
+		// 	rotation: [0, 0, 0],
+		// 	scale: [1, 1, 1],
+		// 	edges: true,
+		// 	performance: false,
+		// 	edgeThreshold: [20, 20, 20, 0]
+		// });
+		// car_model.on("loaded", () => {
+		// 	viewer.cameraFlight.flyTo(car_model);
+		// });
+		// console.log(car_model.aabb)
+		// model_aabb = car_model.aabb
+		// car_model.destroy()
+
+		viewer.scene.highlightMaterial.fillAlpha = 0.9;
+		viewer.scene.highlightMaterial.edgeAlpha = 0.9;
+		viewer.scene.highlightMaterial.edgeColor = [1, 0, 0];
+		viewer.scene.highlightMaterial.edgeWidth = 10;
+
+		viewer.cameraControl.doublePickFlyTo = false
+
+		// var aabb = viewer.scene.getAABB(["car1"])
+
+		const onHover = viewer.cameraControl.on("hover", (e: any) => {
+			const entity = e.entity; // Entity
+			const canvasPos = e.canvasPos; // 2D canvas position
+			console.log(e)
+			// console.log("entity, pos", entity, canvasPos)
+	   });
+
+		// viewer.cameraControl.on("hoverEnter", function (hit: any) {
+		// 	console.log("hits", hit)
+		// 	for (var object = hit.entity; object.parent; object = object.parent) {
+		// 		object.aabbVisible = true;
+		// 	}
+		// });
+
+		// viewer.cameraControl.on("hoverOut", function (hit: any) {
+		// 	console.log("hits", hit)
+		// 	for (var object = hit.entity; object.parent; object = object.parent) {
+		// 		object.aabbVisible = false;
+		// 	}
+		// });
+
+		// viewer.cameraControl.on("picked", function (hit: any) {
+		// 	viewer.cameraFlight.flyTo(hit.mesh);
+		// });
+
+		// viewer.cameraControl.on("pickedNothing", function (hit: any) {
+		// 	viewer.cameraFlight.flyTo(car_model);
+		// });
+
+		// viewer.camera.eye = [2, 30, 30];
+		// viewer.camera.look = [0, 0, 10];
+		// viewer.camera.up = [0, 1, 0];
+
+		// // Configure camera for a World-space in which +Y is considered "up"
+		// viewer.camera.worldAxis = [
+		// 	1, 0, 0,    // Right
+		// 	0, 1, 0,    // Up
+		// 	0, 0, -1     // Forward
+		// ];
+
+		// // Gimbal lock camera yaw rotation to World +Y axis
+		// viewer.camera.gimbalLock = true;
+
+		// const gltfLoader = new GLTFLoaderPlugin(viewer);
+		// const concrete_block = gltfLoader.load({
+		// 	id: "stage1",
+		// 	src: "assets/gltf/concrete_block/scene.gltf",
+		// 	position: [-30, -10, 5],
+		// 	rotation: [-45, -10, 3],
+		// 	scale: [1, 1, 1],
+		// 	edges: true,
+		// 	performance: false
+		// });
+		// concrete_block.on("loaded", () => {
+		// 	viewer.cameraFlight.flyTo(concrete_block);
+		// });
+		// // concrete_block.destroy()
+
+		// const car_model = gltfLoader.load({
+		// 	id: "car1",
+		// 	src: "assets/gltf/honda_civic/scene.gltf",
+		// 	position: [0, 0, 0],
+		// 	rotation: [0, 0, 0],
+		// 	scale: [1, 1, 1],
+		// 	edges: true,
+		// 	performance: false
+		// });
+		// car_model.on("loaded", () => {
+		// 	viewer.cameraFlight.flyTo(car_model);
+		// });
+		// console.log(car_model.aabb)
+		// // car_model.destroy()
+
+		// viewer.scene.highlightMaterial.fillAlpha = 0.6;
+		// viewer.scene.highlightMaterial.edgeAlpha = 0.6;
+		// viewer.scene.highlightMaterial.edgeColor = [1, 0, 0];
+		// viewer.scene.highlightMaterial.edgeWidth = 2;
 
 		// const gltfLoader = new GLTFLoaderPlugin(viewer);
 		// const avocado_model = gltfLoader.load({

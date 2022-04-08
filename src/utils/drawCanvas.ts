@@ -1,4 +1,5 @@
-import * as Kalidokit from "kalidokit";
+// import * as Kalidokit from "kalidokit";
+import { Hand } from "kalidokit";
 import { matrix, multiply, inv, transpose, im } from 'mathjs'
 import { drawConnectors, drawLandmarks } from '@mediapipe/drawing_utils';
 import { HAND_CONNECTIONS, NormalizedLandmarkListList, Results } from '@mediapipe/hands';
@@ -123,6 +124,68 @@ export const resetCubeTracker = () => {
 
 let rsm = new ResultsManager([undefined, undefined, undefined])
 let cubeTracker = new CubeTracker(300, 300, 50, 50, 50, '#ff8200', '#ff6000')
+
+
+class CarTracker {
+	x: number
+	y: number
+	wx: number
+	wy: number
+	h: number
+	// circum circle properties
+	cx: number
+	cy: number
+	r: number
+	r1: number
+	r2: number
+	// [xmin, ymin,zmin,xmax,ymax, zmax]
+
+	constructor(x: number, y: number, wx: number, wy: number, h: number) {
+		this.x = x
+		this.y = y
+		this.wx = wx
+		this.wy = wy
+		this.h = h
+		let [x1, y1, r] = this.circumCircle()
+		this.cx = x1
+		this.cy = y1
+		this.r = r
+		this.r1 = r + h
+		this.r2 = r - h
+	}
+
+	setValues(xmin: number, ymin: number, xmax: number, ymax: number, zmin: number, zmax: number) {
+		this.x = xmin
+		this.y = ymin
+		this.wx = xmax - xmin
+		this.wy = ymax - ymin
+		this.h = zmax - zmin
+		let [x1, y1, r] = this.circumCircle()
+		this.cx = x1
+		this.cy = y1
+		this.r = r
+		this.r1 = r + this.h
+		this.r2 = r - this.h
+	}
+
+	translate(xDeviation: number, yDeviation: number) {
+		this.x += xDeviation
+		this.y += yDeviation
+		this.cx += xDeviation
+		this.cy += yDeviation
+	}
+
+	circumCircle() {
+		const [x1, y1] = [this.x - this.wx, this.y - this.wx * 0.5]
+		const [x2, y2] = [this.x + this.wy, this.y - this.h - this.wy * 0.5]
+		const x = (x1 + x2) / 2
+		const y = (y1 + y2) / 2
+		const r = Math.sqrt(Math.pow(x1 - x2, 2) + Math.pow(y1 - y2, 2)) / 2
+		return [x, y, r]
+	}
+}
+
+let carTracker = new CarTracker(300, 300, 50, 50, 50)
 
 
 function calcTranslation(width: number, height: number) {
@@ -283,6 +346,26 @@ const detectGrabbingCube = (ctx: CanvasRenderingContext2D, handLandmarks: Normal
 	return false
 }
 
+const detectGrabbingCar = (ctx: CanvasRenderingContext2D, handLandmarks: NormalizedLandmarkListList, car_model: any) => {
+	if (handLandmarks.length === 1 && handLandmarks[0] !== undefined) {
+		if (handLandmarks.length === 1 && handLandmarks[0].length > 8) {
+			const width = ctx.canvas.width
+			const height = ctx.canvas.height
+			const [x1, y1] = [handLandmarks[0][8].x * width, handLandmarks[0][8].y * height]
+			const [x2, y2] = [handLandmarks[0][4].x * width, handLandmarks[0][4].y * height]
+			const [xmin, ymin, zmin, xmax, ymax, zmax] = car_model.aabb
+			carTracker.setValues(xmin, ymin, xmax, ymax, zmin, zmax)
+			const dist1 = Math.abs(calcDistance(x1, y1, carTracker.cx, carTracker.cy))
+			const dist2 = Math.abs(calcDistance(x2, y2, carTracker.cx, carTracker.cy))
+			// console.log(dist1, dist2, carTracker.r1, carTracker.r2, carTracker.cx, carTracker.cy)
+			if (dist1 < carTracker.r1 && dist2 < carTracker.r1 && dist1 > carTracker.r2 && dist2 > carTracker.r2) {
+				return true
+			} else return false
+		}
+	}
+	return false
+}
+
 
 
 const cubePositions = [
@@ -326,27 +409,27 @@ const cubePositions = [
 
 
 var vertices = [
-	-1,-1,-1, 1,-1,-1, 1, 1,-1, -1, 1,-1,
-	-1,-1, 1, 1,-1, 1, 1, 1, 1, -1, 1, 1,
-	-1,-1,-1, -1, 1,-1, -1, 1, 1, -1,-1, 1,
-	1,-1,-1, 1, 1,-1, 1, 1, 1, 1,-1, 1,
-	-1,-1,-1, -1,-1, 1, 1,-1, 1, 1,-1,-1,
-	-1, 1,-1, -1, 1, 1, 1, 1, 1, 1, 1,-1, 
+	-1, -1, -1, 1, -1, -1, 1, 1, -1, -1, 1, -1,
+	-1, -1, 1, 1, -1, 1, 1, 1, 1, -1, 1, 1,
+	-1, -1, -1, -1, 1, -1, -1, 1, 1, -1, -1, 1,
+	1, -1, -1, 1, 1, -1, 1, 1, 1, 1, -1, 1,
+	-1, -1, -1, -1, -1, 1, 1, -1, 1, 1, -1, -1,
+	-1, 1, -1, -1, 1, 1, 1, 1, 1, 1, 1, -1,
 ];
 
 var colors = [
-	5,3,7, 5,3,7, 5,3,7, 5,3,7,
-	1,1,3, 1,1,3, 1,1,3, 1,1,3,
-	0,0,1, 0,0,1, 0,0,1, 0,0,1,
-	1,0,0, 1,0,0, 1,0,0, 1,0,0,
-	1,1,0, 1,1,0, 1,1,0, 1,1,0,
-	0,1,0, 0,1,0, 0,1,0, 0,1,0 
+	5, 3, 7, 5, 3, 7, 5, 3, 7, 5, 3, 7,
+	1, 1, 3, 1, 1, 3, 1, 1, 3, 1, 1, 3,
+	0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1,
+	1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0,
+	1, 1, 0, 1, 1, 0, 1, 1, 0, 1, 1, 0,
+	0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0
 ];
 
 var indices = [
-	0,1,2, 0,2,3, 4,5,6, 4,6,7,
-	8,9,10, 8,10,11, 12,13,14, 12,14,15,
-	16,17,18, 16,18,19, 20,21,22, 20,22,23 
+	0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7,
+	8, 9, 10, 8, 10, 11, 12, 13, 14, 12, 14, 15,
+	16, 17, 18, 16, 18, 19, 20, 21, 22, 20, 22, 23
 ];
 
 function get_projection(angle: number, a: number, zMin: number, zMax: number) {
@@ -463,7 +546,7 @@ export const drawGLCube = (gl: WebGLRenderingContext) => {
 	const width = gl.canvas.width
 	const height = gl.canvas.height
 
-	var proj_matrix = get_projection(40, width/height, 1, 100);
+	var proj_matrix = get_projection(40, width / height, 1, 100);
 	/*=========================rotation================*/
 
 	function rotateX(m: any, angle: number) {
@@ -600,7 +683,7 @@ let time = 0
  * @param gl webgl context
  * @param results mediapipe model results
  */
-export const drawGLCanvas = (gl: any, ctx: CanvasRenderingContext2D, results: Results) => {
+export const drawGLCanvas = (gl: any, ctx: CanvasRenderingContext2D, results: Results, viewer: any, model_aabb: any) => {
 	rsm.setResultsArr(results.multiHandLandmarks)
 	rsm.setResultsWorldArr(results.multiHandWorldLandmarks)
 	// console.log(rsm.resultsArr)
@@ -633,6 +716,24 @@ export const drawGLCanvas = (gl: any, ctx: CanvasRenderingContext2D, results: Re
 		}
 		// show the circle based on landmarks
 		// drawCircleBwHands(ctx, results.multiHandLandmarks);
+		console.log(viewer.scene.modelIds)
+		console.log(model_aabb)
+		const car_model = viewer.scene.models["car1"];
+		if (car_model) {
+			console.log(car_model.aabb)
+			var aabb = viewer.scene.getAABB(["car1"])
+			// console.log(aabb)
+			const isGrabbingCar = detectGrabbingCar(ctx, results.multiHandLandmarks, car_model)
+			console.log("grabbing car", isGrabbingCar)
+			console.log(viewer.scene.highlightedObjectIds)
+			if (isGrabbingCar === true) {
+				let [xDev, yDev] = calcTranslation(width, height)
+				console.log(xDev, yDev)
+				carTracker.translate(xDev, yDev);
+			}
+			// car_model.destroy()
+		}
+
 		const isGrabbing = detectGrabbingCube(ctx, results.multiHandLandmarks)
 		console.log(isGrabbing)
 		if (isGrabbing === true) {
@@ -640,8 +741,9 @@ export const drawGLCanvas = (gl: any, ctx: CanvasRenderingContext2D, results: Re
 			console.log(xDev, yDev)
 			cubeTracker.translate(xDev, yDev);
 		}
+
 		if (results.multiHandLandmarks !== undefined && results.multiHandLandmarks.length > 0) {
-			let rightHandRig = Kalidokit.Hand.solve(results.multiHandLandmarks[0], "Right")
+			let rightHandRig = Hand.solve(results.multiHandLandmarks[0], "Right")
 			console.log(rightHandRig)
 		}
 		drawCube(ctx, cubeTracker.x, cubeTracker.y, cubeTracker.wx, cubeTracker.wy, cubeTracker.h, cubeTracker.color) // green: #8fce00 red: #cc0000 orange: #ff8200 dark-blue: #2A385B
@@ -654,7 +756,7 @@ export const drawGLCanvas = (gl: any, ctx: CanvasRenderingContext2D, results: Re
  * @param ctx webgl context
  * @param results mediapipe model results
  */
- export const drawCanvas = (ctx: CanvasRenderingContext2D, results: Results) => {
+export const drawCanvas = (ctx: CanvasRenderingContext2D, results: Results) => {
 	rsm.setResultsArr(results.multiHandLandmarks)
 	rsm.setResultsWorldArr(results.multiHandWorldLandmarks)
 	// console.log(rsm.resultsArr)
@@ -685,7 +787,7 @@ export const drawGLCanvas = (gl: any, ctx: CanvasRenderingContext2D, results: Re
 			cubeTracker.translate(xDev, yDev);
 		}
 		if (results.multiHandLandmarks !== undefined && results.multiHandLandmarks.length > 0) {
-			let rightHandRig = Kalidokit.Hand.solve(results.multiHandLandmarks[0], "Right")
+			let rightHandRig = Hand.solve(results.multiHandLandmarks[0], "Right")
 			console.log(rightHandRig)
 		}
 		drawCube(ctx, cubeTracker.x, cubeTracker.y, cubeTracker.wx, cubeTracker.wy, cubeTracker.h, cubeTracker.color) // green: #8fce00 red: #cc0000 orange: #ff8200 dark-blue: #2A385B

@@ -1,0 +1,11 @@
+Model Information:
+* title:	Honda Civic Type R -98 (Free Asset)
+* source:	https://sketchfab.com/3d-models/honda-civic-type-r-98-free-asset-b9604dd71c6546ec842702682019492a
+* author:	tiedtke (https://sketchfab.com/tiedtke)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Honda Civic Type R -98 (Free Asset)" (https://sketchfab.com/3d-models/honda-civic-type-r-98-free-asset-b9604dd71c6546ec842702682019492a) by tiedtke (https://sketchfab.com/tiedtke) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
