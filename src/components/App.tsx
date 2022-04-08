@@ -237,20 +237,20 @@ export const App: VFC = () => {
 			root.scaling = new BABYLON.Vector3(scaling[0], scaling[1], scaling[2]);
 		}, null, null, ".gltf");
 
-		// BABYLON.SceneLoader.ImportMesh("", "assets/gltf/concrete_block/scene.gltf", "", scene, function (newMeshes) {
-		// 	console.log("loaded concrete block!")
-		// 	// // small block in left edge of screen
-		// 	// var position = [-20, -5, 0]
-		// 	// var scaling = [1, 1, 1]
-		// 	// var rotation = [-10, 0, 0]
-		// 	// large block
-		// 	var position = [-10, -9, 0]
-		// 	var scaling = [7, 7, 7]
-		// 	var rotation = [3, 0, 0]
-		// 	newMeshes[0].position = new BABYLON.Vector3(position[0], position[1], position[2]);// position mesh in your scene
-		// 	rotateMesh(newMeshes[0], scene, rotation)
-		// 	newMeshes[0].scaling = new BABYLON.Vector3(scaling[0], scaling[1], scaling[2]);
-		// }, null, null, ".gltf");
+		BABYLON.SceneLoader.ImportMesh("", "assets/gltf/concrete_block/scene.gltf", "", scene, function (newMeshes) {
+			console.log("loaded concrete block!")
+			// // small block in left edge of screen
+			// var position = [-20, -5, 0]
+			// var scaling = [1, 1, 1]
+			// var rotation = [-10, 0, 0]
+			// large block
+			var position = [-10, -9, 0]
+			var scaling = [7, 7, 7]
+			var rotation = [3, 0, 0]
+			newMeshes[0].position = new BABYLON.Vector3(position[0], position[1], position[2]);// position mesh in your scene
+			rotateMesh(newMeshes[0], scene, rotation)
+			newMeshes[0].scaling = new BABYLON.Vector3(scaling[0], scaling[1], scaling[2]);
+		}, null, null, ".gltf");
 
 		scene.clearColor = new BABYLON.Color4(0, 0, 0, 0);
 
