@@ -4,6 +4,8 @@ import { matrix, multiply, inv, transpose } from 'mathjs'
 import { drawConnectors, drawLandmarks } from '@mediapipe/drawing_utils';
 import { HAND_CONNECTIONS, NormalizedLandmarkListList, Results } from '@mediapipe/hands';
 import { calcDistance, calcCentroid, degrees_to_radians } from "./vectorMath";
+import * as BABYLON from 'babylonjs';
+import 'babylonjs-loaders';
 
 
 class ResultsManager {
@@ -152,6 +154,13 @@ class CarTracker {
 		this.cy += yDeviation
 	}
 
+	translateUsingPosition(position: BABYLON.Vector3) {
+		this.x = position.x
+		this.y = position.y
+		this.cx = position.x
+		this.cy = position.y
+	}
+
 	circumCircle() {
 		const [x1, y1] = [this.x - this.wx, this.y - this.wx * 0.5]
 		const [x2, y2] = [this.x + this.wy, this.y - this.h - this.wy * 0.5]
@@ -240,7 +249,7 @@ function calcRotation() {
 }
 
 /******* Finds Bounding Info ******/
-const findBoundingBox2 = (scene: BABYLON.Scene) => {
+const findBoundingBox2 = (scene: BABYLON.Scene): [any, BABYLON.BoundingInfo, BABYLON.AbstractMesh] => {
 	var root_meshes = scene.meshes.filter((x) => {
 		return x.parent == null
 	})
@@ -262,7 +271,7 @@ const findBoundingBox2 = (scene: BABYLON.Scene) => {
 	return [size, boundingInfo, root]
 }
 
-const getProjectedPosition = (scene: BABYLON.Scene, parent_mesh: BABYLON.AbstractMesh) => {
+const getProjectedPositionOfMesh = (scene: BABYLON.Scene, mesh: BABYLON.AbstractMesh) => {
 	let engine = scene.getEngine();
 	let globalViewport = scene.cameras[0].viewport.toGlobal(
 		engine.getRenderWidth(),
@@ -270,7 +279,23 @@ const getProjectedPosition = (scene: BABYLON.Scene, parent_mesh: BABYLON.Abstrac
 	);
 
 	let projectedPosition = BABYLON.Vector3.Project(
-		parent_mesh.position,
+		mesh.position,
+		BABYLON.Matrix.Identity(),
+		scene.getTransformMatrix(),
+		globalViewport
+	);
+	return projectedPosition
+}
+
+const getProjectedPositionOfVector = (scene: BABYLON.Scene, vec: BABYLON.Vector3) => {
+	let engine = scene.getEngine();
+	let globalViewport = scene.cameras[0].viewport.toGlobal(
+		engine.getRenderWidth(),
+		engine.getRenderHeight()
+	);
+
+	let projectedPosition = BABYLON.Vector3.Project(
+		vec,
 		BABYLON.Matrix.Identity(),
 		scene.getTransformMatrix(),
 		globalViewport
@@ -360,27 +385,27 @@ const detectGrabbingCube = (ctx: CanvasRenderingContext2D, handLandmarks: Normal
 	return false
 }
 
-const detectGrabbingCar = (ctx: CanvasRenderingContext2D, handLandmarks: NormalizedLandmarkListList, scene: BABYLON.Scene) => {
+const detectGrabbingCar = (gl: WebGLRenderingContext, handLandmarks: NormalizedLandmarkListList, scene: BABYLON.Scene) => {
 	if (handLandmarks.length === 1 && handLandmarks[0] !== undefined) {
 		if (handLandmarks.length === 1 && handLandmarks[0].length > 8) {
-			const width = ctx.canvas.width
-			const height = ctx.canvas.height
+			const width = gl.canvas.width
+			const height = gl.canvas.height
 			const [x1, y1] = [handLandmarks[0][8].x * width, handLandmarks[0][8].y * height]
 			const [x2, y2] = [handLandmarks[0][4].x * width, handLandmarks[0][4].y * height]
 			let [size, boundingInfo, root] = findBoundingBox2(scene)
-			var projectedPosition = getProjectedPosition(scene, root)
+			var projectedPosition = getProjectedPositionOfMesh(scene, root)
 			console.log("projected pos")
-			console.log(projectedPosition);
-			// console.log("bounding info", boundingInfo)
-			console.log("size", size)
-			const [xmin, ymin, zmin, xmax, ymax, zmax] = [projectedPosition.x, projectedPosition.y, projectedPosition.z, size[0], size[1], size[2]]
-			// console.log("values: ", [xmin, ymin, zmin, xmax, ymax, zmax])
+			console.log(width - projectedPosition.x, projectedPosition.y);
+			console.log("hand position", x1, y1, x2, y2)
+			var max_proj = getProjectedPositionOfVector(scene, boundingInfo.maximum)
+			var min_proj = getProjectedPositionOfVector(scene, boundingInfo.minimum)
+			// console.log("size", size)
+			const [xmin, ymin, zmin, xmax, ymax, zmax] = [width - projectedPosition.x, projectedPosition.y, width - projectedPosition.x, width - min_proj.x, min_proj.y, width - min_proj.x]
+			console.log("values: ", [xmin, ymin, zmin, xmax, ymax, zmax])
 			carTracker.setValues(xmin, ymin, xmax, ymax, zmin, zmax)
-			// const [xmin, ymin, zmin, xmax, ymax, zmax] = [root.position.x, root.position.y, root.position.z, size[0], size[1], size[2]]
-			// console.log("values: ", [xmin, ymin, zmin, xmax, ymax, zmax])
-			// carTracker.setValues(xmin, ymin, xmax, ymax, zmin, zmax)
-			const dist1 = Math.abs(calcDistance(x1, y1, carTracker.cx, carTracker.cy))
-			const dist2 = Math.abs(calcDistance(x2, y2, carTracker.cx, carTracker.cy))
+			const dist1 = Math.abs(calcDistance(x1, y1, width - projectedPosition.x, projectedPosition.y))
+			const dist2 = Math.abs(calcDistance(x2, y2, width - projectedPosition.x, projectedPosition.y))
+			carTracker.circumCircle()
 			// console.log(dist1, dist2, carTracker.r1, carTracker.r2, carTracker.cx, carTracker.cy)
 			if (dist1 < carTracker.r1 && dist2 < carTracker.r1 && dist1 > carTracker.r2 && dist2 > carTracker.r2) {
 				return true
@@ -442,7 +467,7 @@ const rotateMesh = (parent_mesh: BABYLON.AbstractMesh, scene: BABYLON.Scene, ang
  * @param gl webgl context
  * @param results mediapipe model results
  */
-export const drawGLCanvas = (gl: any, ctx: CanvasRenderingContext2D, results: Results, scene: BABYLON.Scene, parent_mesh: any) => {
+export const drawGLCanvas = (gl: WebGLRenderingContext, ctx: CanvasRenderingContext2D, results: Results, scene: BABYLON.Scene, parent_mesh: any) => {
 	rsm.setResultsArr(results.multiHandLandmarks)
 	rsm.setResultsWorldArr(results.multiHandWorldLandmarks)
 	// console.log(rsm.resultsArr)
@@ -467,17 +492,19 @@ export const drawGLCanvas = (gl: any, ctx: CanvasRenderingContext2D, results: Re
 		// show the circle based on landmarks
 		// drawCircleBwHands(ctx, results.multiHandLandmarks);
 
-		const isGrabbingCar = detectGrabbingCar(ctx, results.multiHandLandmarks, scene)
+		const isGrabbingCar = detectGrabbingCar(gl, results.multiHandLandmarks, scene)
 		console.log("grabbing car", isGrabbingCar)
-		// if (isGrabbingCar === true) {
-		// 	// let [xDev, yDev] = calcTranslation(width, height)
-		// 	// console.log(xDev, yDev)
-		// 	// carTracker.translate(xDev, yDev);
-		// }
-		let [xDev, yDev] = calcTranslation(width, height)
-		let deviations = [xDev, yDev, 0]
-		// console.log("deviations", deviations)
-		translateCar(parent_mesh, scene, carTracker, deviations)
+		if (isGrabbingCar === true) {
+			let [xDev, yDev] = calcTranslation(width, height)
+			let deviations = [xDev, yDev, 0]
+			translateCar(parent_mesh, scene, carTracker, deviations)
+			carTracker.translateUsingPosition(parent_mesh.position)
+		}
+
+		// let [xDev, yDev] = calcTranslation(width, height)
+		// let deviations = [xDev, yDev, 0]
+		// // console.log("deviations", deviations)
+		// translateCar(parent_mesh, scene, carTracker, deviations)
 
 
 		// const isGrabbing = detectGrabbingCube(ctx, results.multiHandLandmarks)
